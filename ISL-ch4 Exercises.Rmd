@@ -1,0 +1,1019 @@
+---
+title: "ISL-ch4 Lab and Exrecises.Rmd"
+output: html_notebook
+---
+
+```{r Lab 4.6.2 Logistic regression}
+library(tidyverse)
+
+smarket.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Smarket.csv", header=T, stringsAsFactors = T, na.strings = "?")
+
+smarket.df = as_tibble(smarket.df)
+
+str(attributes(smarket.df))
+str(smarket.df)
+
+cor(smarket.df[, -10])
+
+group <- NA
+group[smarket.df$Direction == "Up"] <- 1
+group[smarket.df$Direction == "Down"]  <- 2
+group[is.na(smarket.df$Direction)] <- 3
+
+pairs(smarket.df[, -10],
+      col = c("red", "cornflowerblue", "purple")[group],   # Change color by group
+      pch = c(8, 18, 1)[group],                            # Change points by group
+      main = "This is an even nicer pairs plot in R")
+
+# let's do the logistic regression
+glm.fit <- glm (Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, data = smarket.df, family = binomial)
+summary(glm.fit)
+
+# contrats shows Direction is set to dummy variable 1 for "Up"
+contrasts(smarket.df$Direction)
+
+# This basically returns P(Y=1 | X) which means P(Y="Up" | X)
+glm.probs <- predict(glm.fit, type="response")
+
+# Since no data is given to predict , model is applied against the training data (i.e smarket.df)
+# Thus the order of elements in the vector is the same as order of elements in smarket.df dataframe
+
+# Let's convert probabilities to Up and down
+Direction.pred <- rep("Down", nrow(smarket.df))
+Direction.pred[glm.probs > 0.5] <- "Up"
+
+
+# now use table to create a confusion matrix using predidted Direction vs training data Direction
+(confusionMatrix <- table(Direction.pred, smarket.df$Direction))
+
+# Now we can calculate training error rate
+(trainingErrorRate <- (confusionMatrix[1,1] + confusionMatrix[2,2])/nrow(smarket.df))
+
+(trainingErrorRate2 <- nrow(smarket.df[smarket.df$Direction == Direction.pred, ]) / nrow(smarket.df))
+stopifnot(trainingErrorRate == trainingErrorRate2)
+
+# We really need to test the model against test data
+# Thus we need to train it on some part of the data and test it against some other part 
+
+# lets train model only on observations of year >= 2000
+smarket.df.2005 <- smarket.df[smarket.df$Year >= 2005, ]
+dim(smarket.df.2005) # 252 observations have year >= 2005
+
+
+# side note
+stopifnot(smarket.df.2005$Direction == smarket.df$Direction[smarket.df$Year >= 2005])
+
+Direction.2005 <- smarket.df.2005$Direction
+
+# now we fit the model (using subset) only to observations of year < 2005
+glm.fit <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, 
+               data = smarket.df,family = binomial, subset = smarket.df$Year < 2005)
+
+
+summary(glm.fit)
+# Run the model on test data (i.e observations for which Year >= 2005) 
+glm.probs <- predict(glm.fit,smarket.df.2005, type="response")
+stopifnot(length(glm.probs) == length(Direction.2005))
+# Convert thr probabilities into Up and Down using threshold 0.5
+glm.pred <- rep("Down", nrow(smarket.df.2005))
+glm.pred [glm.probs > .5] = "Up"
+table(glm.pred, Direction.2005)
+
+# calculate proportion of correct prediction
+mean(glm.pred == Direction.2005)
+
+# calculate test error rate
+mean(glm.pred != Direction.2005)
+
+# clearly the test error rate is too high Lets remove predictors with highest p-value
+# we obly keep Lag1 and Lag2
+
+glm.fit <- glm(Direction ~ Lag1 + Lag2, data = smarket.df,family = binomial, subset = smarket.df$Year < 2005)
+summary(glm.fit)
+
+# get the probabilities
+glm.probs <- predict(glm.fit,smarket.df.2005 , type = "response")
+
+# convert them to up and down
+glm.preds <- rep("Down", nrow(smarket.df.2005))
+glm.preds[glm.probs >= 0.5] = "Up"
+
+(conf_matrix <- table(glm.preds , Direction.2005))
+mean(glm.preds == Direction.2005)
+
+# test error rate 
+mean(glm.preds != Direction.2005)
+
+(FP_rate <- conf_matrix[2,1]/(conf_matrix[2,1] + conf_matrix[1,1]))
+(TP_rate <- conf_matrix[2,2]/(conf_matrix[2,2] + conf_matrix[1,2]))
+
+# Now calculate Area under the curve
+library(pROC)
+roc_obj <- roc(Direction.2005, glm.probs)
+auc(roc_obj)
+
+# For some reason roc_obj$specificities has extra row
+# roc_df <- tibble(
+#   TPR=rev(roc_obj$sensitivities), 
+#   FPR=rev(1 - roc_obj$specificities), 
+#   labels=roc_obj$response, 
+#   scores=roc_obj$predictor)
+
+
+# we can predict based on specefic values of Lag1 nd Lag2
+(glm.probs <- predict(glm.fit,tibble(Lag1 = c(1.2, 1.5), Lag2 = c(1.1, -0.8)) , type = "response"))
+
+```
+
+```{r Lab 4.6.3 LDA}
+
+library(tidyverse)
+
+smarket.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Smarket.csv", header=T, stringsAsFactors = T, na.strings = "?")
+
+smarket.df = as_tibble(smarket.df)
+
+# split to test train
+smarket.df.2005 <- smarket.df[smarket.df$Year >= 2005, ]
+Direction.2005 <- smarket.df.2005$Direction
+
+# Note we use only Lag1 and Lag2 due to others predictors are even lower in statistically significance
+(lda.fit <- MASS::lda(Direction ~ Lag1 + Lag2, data = smarket.df,family = binomial, subset = smarket.df$Year < 2005))
+
+contrasts(smarket.df$Direction)
+
+
+# if Lag1 * -0.642 + Lag2 * -0.5135293 is large then LDA predicts market increases otherwise it decreases
+tibble(l1 = smarket.df[smarket.df$Year < 2005, ]$Lag1, l2 = smarket.df[smarket.df$Year < 2005, ]$Lag2, combination = smarket.df[smarket.df$Year < 2005, ]$Lag1 * -0.642 + smarket.df[smarket.df$Year < 2005, ]$Lag2 * -0.5135293) %>%
+  ggplot(mapping = aes(x= l2, y = combination)) +
+  geom_point()+
+  geom_smooth(se=F)
+
+plot(smarket.df[smarket.df$Year < 2005, ]$Lag1 * -0.642 + smarket.df[smarket.df$Year < 2005, ]$Lag2 * -0.5135293)
+
+# lets predict on test data using the model:
+lda.pred <- predict(lda.fit, smarket.df.2005)
+names(lda.pred)
+
+# first get class ("Up", or "Down") from lda.pred
+lda.class <- lda.pred$class
+lda.posterior.Down = lda.pred$posterior[,1]
+lda.posterior.Up = lda.pred$posterior[,2]
+
+table(lda.class, Direction.2005)
+mean(lda.class == Direction.2005)
+# recreate the predictions contained in lda.pred$class.
+sum(lda.pred$posterior[,1]>=.5)
+sum(lda.pred$posterior[,1]<.5)
+
+# posterior probability output by the model corresponds to "Down" probability :
+# lda.pred$posterior[1:20,1]
+# lda.class[1:20]
+
+(class_prob <- tibble(probability = lda.pred$posterior[,1], cluster = lda.class))
+
+
+
+library(pROC)
+roc_obj <- roc(Direction.2005, lda.posterior.Up)
+auc(roc_obj)
+# roc_df <- tibble(
+#   TPR=rev(roc_obj$sensitivities),
+#   FPR=rev(1 - roc_obj$specificities),
+#   labels=roc_obj$response,
+#   scores=roc_obj$predictor)
+
+
+
+```
+```{r Lab 4.6.4 QDA}
+
+library(tidyverse)
+
+smarket.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Smarket.csv", header=T, stringsAsFactors = T, na.strings = "?")
+
+smarket.df = as_tibble(smarket.df)
+
+# split to test train
+smarket.df.2005 <- smarket.df[smarket.df$Year >= 2005, ]
+Direction.2005 <- smarket.df.2005$Direction
+
+# Note we use only Lag1 and Lag2 due to others predictors are even lower in statistically significance
+(qda.fit <- MASS::qda(Direction ~ Lag1 + Lag2, data = smarket.df,family = binomial, subset = smarket.df$Year < 2005))
+
+qda.fit
+contrasts(smarket.df$Direction)
+
+qda.pred <- predict(qda.fit, smarket.df.2005)
+names(qda.pred)
+
+# first get class ("Up", or "Down") from lda.pred
+qda.class <- qda.pred$class
+qda.posterior.Down = qda.pred$posterior[,1]
+qda.posterior.Up = qda.pred$posterior[,2]
+
+table(qda.class, Direction.2005)
+mean(qda.class == Direction.2005)
+# recreate the predictions contained in lda.pred$class.
+sum(qda.pred$posterior[,1]>=.5)
+sum(qda.pred$posterior[,1]<.5)
+
+(class_prob <- tibble(probability = qda.pred$posterior[,1], cluster = qda.class))
+
+library(pROC)
+roc_obj <- roc(Direction.2005, qda.posterior.Up)
+auc(roc_obj)
+
+# QDA predictions are accurate almost 60% of the time
+# This level of accuracy is quite impressive for stock market data, which is known to be quite hard to model accurately
+# However, we recommend evaluating this method’s performance on a larger test set before betting that this approach will consistently beat the market!
+
+```
+```{r Lab 4.6.5 KNN}
+
+# knn() forms predictions using a single command
+library(class)
+library(tidyverse)
+
+smarket.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Smarket.csv", header=T, stringsAsFactors = T, na.strings = "?")
+
+smarket.df = as_tibble(smarket.df)
+
+smarket.df.2005 <- smarket.df[smarket.df$Year >= 2005, ]
+Direction.2005 <- smarket.df.2005$Direction
+
+# first create train and test data
+train.X <- cbind(smarket.df$Lag1,smarket.df$Lag2)[smarket.df$Year < 2005, ] 
+test.X <- cbind(smarket.df$Lag1,smarket.df$Lag2)[smarket.df$Year >= 2005, ] 
+train.Direction =smarket.df$Direction [smarket.df$Year < 2005]
+
+# a seed must be set in order to ensure reproducibility of results.
+set.seed (1)
+# arg1 : matrix containing the predictors associated with the training data
+# arg2 : matrix containing the predictors associated with the test data
+# arg3 : A vector containing the class labels for the training observations
+# arg4 : number of nearest neighbors
+knn.pred=knn(train.X,test.X,train.Direction ,k=3)
+str(attributes(knn.pred))
+
+table(knn.pred,Direction.2005)
+mean (knn.pred == Direction.2005)
+```
+
+```{r 4.6.6 An Application to Caravan Insurance Data}
+library(tidyverse)
+library(class)
+caravan.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Caravan.csv", header=T, stringsAsFactors = T, na.strings = "?")
+
+caravan.df = as_tibble(caravan.df)
+dim(caravan.df)
+names(caravan.df)
+# KNN classifier predicts the class of a given test observation by identifying the observations that are nearest to it, the scale of the variables matters.
+#str(caravan.df)
+summary(caravan.df$Purchase)
+
+# To use KNN we should first standardize all qualitative columns
+# result of scal is a matrix
+standardized.carvan <- scale(caravan.df[, -87])
+
+# Let's break it into test and train
+test = 1:1000
+
+train.X <- standardized.carvan[-test, ]
+test.X <- standardized.carvan[test, ]
+
+# split corresponding response variable
+train.Y <- caravan.df$Purchase[-test]
+test.Y <-  caravan.df$Purchase[test]
+
+# now do the KNN 
+set.seed(1)
+knn.pred <- class::knn(train.X, test.X, train.Y, k = 2)
+mean(test.Y != "No")
+(conf_matrix <- table (knn.pred, test.Y))
+ 
+# precision is high and that is what is important in this use case
+(precision <- conf_matrix[2,1]/(conf_matrix[2,1] + conf_matrix[2,2]))
+
+# Use logistic regression to compare
+# Note for Logistic regression we do not need to standardize the predictors
+
+dim(caravan.df[test, ])
+
+glm.fit <- glm(Purchase ~ MGEMLEEF + PPERSAUT + PLEVEN + PBRAND + PBRAND + ALEVEN + APLEZIER , data =caravan.df, family = binomial, subset = -test)
+summary(glm.fit)
+glm.probs <- predict(glm.fit, caravan.df[test, ], type =  "response")
+stopifnot(length(glm.probs) == length(test.Y))
+glm.pred <- ifelse(glm.probs > 0.05 , "Yes", "No")
+table(glm.pred, test.Y)
+
+```
+```{r Exercise 10}
+library(tidyverse)
+library(class)
+weekly.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
+                      header=T, stringsAsFactors = T, na.strings = "?")
+weekly.df = tibble(weekly.df)
+#names(weekly.df)
+dim(weekly.df)
+#str(weekly.df)
+
+# a) Let's take some summary 
+summary(weekly.df)
+cor(weekly.df[, -9])
+
+# percentage of up and down classification:
+table(weekly.df$Direction)/sum(table(weekly.df$Direction))
+
+# The only correlation is between Year and Volume which is 0.84194162
+group <- NA
+group[weekly.df$Direction == "Up"] <- 1
+str(group)
+group[weekly.df$Direction == "Down"]  <- 2
+str(group)
+group[is.na(weekly.df$Direction)] <- 3
+
+pairs(weekly.df[, -9],
+      col = c("red", "cornflowerblue", "purple")[group],   # Change color by group
+      pch = c(8, 18, 1)[group],                            # Change points by group
+      main = "correlation between oairs of predictors in weekly stock")
+
+# b) Logistic regression using full data set:
+glm.fit <- glm(Direction ~ . -Year -Today, data = weekly.df, family = binomial)
+summary(glm.fit)
+
+# Lag2 is the only predictor that is ststistically significant
+
+# How well our model fits depends on the difference between the model and the observed data.  
+# One approach for binary data is to implement a Hosmer Lemeshow goodness of fit test:
+
+library(ResourceSelection)
+hoslem.test(weekly.df$Direction, fitted(glm.fit))
+
+# c) confusion matrix
+
+# first lets see the contrasts of Direction to know what is assigned to 1 and which is 2
+contrasts(weekly.df$Direction)
+
+# Contrasts shows Down is 0 and Up is 1
+# Since Posterior is P(Y=1|X) Tuse if posterior > 0.5 it should be "Up"
+
+glm.probs <- predict(glm.fit, weekly.df, type =  "response")
+glm.predict <- ifelse(glm.probs > 0.5 , "Up", "Down")
+(confusion_table <- table(glm.predict, weekly.df$Direction))
+
+# overall fraction of correct predictions:
+sprintf("overall fraction of correct predictions: %s", mean(glm.predict == weekly.df$Direction))
+
+# Null classifier:
+sprintf("Null classifier : %s ", (48 + 557)/(48 + 557 + 430 + 54) )
+
+# FP rate:
+sprintf("FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+
+# d) 
+
+train <- (weekly.df$Year >= 1990 & weekly.df$Year <= 2008)
+test.Y <- weekly.df[!train,]$Direction
+test.X <- weekly.df[!train,]
+train.Y <- weekly.df[train, ]$Direction
+
+glm.fit <- glm(Direction ~ Lag2, data = weekly.df, family = binomial, subset = train)
+sprintf("summary of logistic regression: ")
+summary(glm.fit)
+
+glm.probs <- predict(glm.fit, test.X, type =  "response")
+# again since contrasts(weekly.df$Direction) shows dummy variable 1 asigned to Up 
+# and since P(y=1|x) is glm.probs what we get is prosterior of probability of Up scenario
+glm.pred <- ifelse(glm.probs > 0.5, "Up", "Down")
+
+stopifnot(length(glm.pred) == length(test.Y))
+
+
+(confusion_table <- table(glm.pred, test.Y))
+
+# Null classifier:
+sprintf("Logistic Regression : Null classifier : %s ", (5 + 56)/(5 + 56 + 9 + 34) )
+
+# overall fraction of correct predictions:
+sprintf("Logistic Regression : overall fraction of correct predictions: %s", mean(glm.pred == test.Y))
+
+# FP rate:
+sprintf("Logistic Regression : FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("Logistic Regression : TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("Logistic Regression : precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("Logistic Regression : specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+library(pROC)
+roc_obj <- roc(test.Y, glm.probs)
+auc(roc_obj)
+# -----------------------------
+# e) repeat part (d) using LDA
+
+lda.fit <- MASS::lda(Direction ~ Lag2, data = weekly.df,family = binomial, subset = train)
+
+# contrasts shows 1 is adssigned to Up
+contrasts(weekly.df$Direction)
+
+# lets predict on test data using the model:
+lda.pred <- predict(lda.fit, test.X, type =  "response")
+names(lda.pred)
+
+stopifnot(length (lda.pred$class) == length(test.Y))
+(confusion_table <- table(lda.pred$class, test.Y))
+
+# Null classifier:
+sprintf("LDA: Null classifier : %s ", (5 + 56)/(5 + 56 + 9 + 34) )
+
+# overall fraction of correct predictions:
+sprintf("LDA: overall fraction of correct predictions: %s", mean(lda.pred$class == test.Y))
+
+# FP rate:
+sprintf("LDA: FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("LDA: TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("LDA: precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("LDA: specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+
+# Below is the corresponding posterior probabilities of tests
+colnames(lda.pred$posterior)
+lda.pred$posterior[1:10, "Up"]
+lda.pred$posterior[1:10, "Down"]
+
+library(pROC)
+roc_obj <- roc(test.Y, lda.pred$posterior[, "Up"])
+auc(roc_obj)
+
+# -----------------------------
+# f) repeat part (d) using QDA
+
+qda.fit <- MASS::qda(Direction ~ Lag2, data = weekly.df,family = binomial, subset = train)
+
+# contrasts shows 1 is adssigned to Up
+contrasts(weekly.df$Direction)
+
+# lets predict on test data using the model:
+qda.pred <- predict(qda.fit, test.X, type =  "response")
+names(qda.pred)
+
+stopifnot(length (qda.pred$class) == length(test.Y))
+(confusion_table <- table(qda.pred$class, test.Y))
+
+# Null classifier:
+sprintf("QDA: Null classifier : %s ", 61/(61+43) )
+
+# overall fraction of correct predictions:
+sprintf("QDA: overall fraction of correct predictions: %s", mean(qda.pred$class == test.Y))
+
+# FP rate:
+sprintf("QDA: FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("QDA: TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("QDA: precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("QDA: specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+
+# Below is the corresponding posterior probabilities of tests
+colnames(qda.pred$posterior)
+qda.pred$posterior[1:10, "Up"]
+qda.pred$posterior[1:10, "Down"]
+
+library(pROC)
+roc_obj <- roc(test.Y, qda.pred$posterior[, "Up"])
+auc(roc_obj)
+# -----------------------------
+# g) repeat part (d) using KNN where K = 1
+
+# First remove NAs
+
+# Now find a subset of records that have at least one NA 
+# dfSubsetWithNa <- weekly.df[rowSums(is.na(weekly.df)) > 0,]
+# head(dfSubsetWithNa)
+
+# # Check a particular column that has NA and include the record
+# dfSubsetWithNaInOneCol <- weekly.df[is.na(weekly.df$Directions), ]
+# head(dfSubsetWithNaInOneCol)
+
+# get a subset of records in dataframe with no NA in any column:
+# dfSubsetWithNoNa <- weekly.df[rowSums(is.na(weekly.df)) == 0, ]
+# head(dfSubsetWithNoNa)
+
+
+# To use KNN first we need to standardize the predictor Lag2
+
+standardized.weekly <- scale(weekly.df[, c("Lag2")])
+names(standardized.weekly)
+# now split it into to train and test
+# First make a dataframe
+helperDf <- tibble(Year = weekly.df$Year, Direction = weekly.df$Direction 
+                , Lag2 = standardized.weekly[,1])
+head(helperDf)
+
+# Let's break helper into test and train
+
+train.X <- helperDf[train, "Lag2"]
+train.Y <- helperDf[train, ]$Direction
+test.X <- helperDf[!train, "Lag2"]
+test.Y <- helperDf[!train, ]$Direction
+
+# now do the KNN 
+set.seed(1)
+knn.pred <- class::knn(train.X, test.X, train.Y, k = 1)
+
+(confusion_table <- table (knn.pred, test.Y))
+stopifnot(length (knn.pred) == length(test.Y))
+
+# Null classifier:
+sprintf("KNN: Null classifier : %s ", (31+30)/(21+22+31+30) )
+
+# overall fraction of correct predictions:
+sprintf("KNN: overall fraction of correct predictions: %s", mean(knn.pred == test.Y))
+
+# FP rate:
+sprintf("KNN: FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("KNN: TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("KNN: precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("KNN: specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+print ("LDA and QDA are best classifiers with 62% of overall correct prediction.")
+
+```
+
+```{r Exercise 11}
+library(tidyverse)
+library(class)
+car.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Auto.csv", 
+                      header=T, stringsAsFactors = T, na.strings = "?")
+car.df = tibble(car.df)
+dim(car.df)
+
+# a) 
+car.df <- car.df %>%
+  mutate(mpg01 = ifelse (mpg > median(mpg), 1, 0))
+colnames(car.df)
+median(car.df$mpg)
+
+# b) Explore the data graphically 
+
+# group <- NA
+# group[car.df$mpg01 == "0"] <- 1
+# group[car.df$mpg01 == "1"]  <- 2
+# 
+# pairs(car.df[, c("mpg01", "year")],
+#       col = c("red", "cornflowerblue", "purple")[group],   # Change color by group
+#       pch = c(8, 18, 1)[group],                            # Change points by group
+#       main = "correlation between mpg01 and other predictors ")
+# 
+
+car.df %>%
+  ggplot() +
+   geom_point(mapping = aes(x = mpg, y = year, color = mpg01))
+
+boxplot(year~mpg01,car.df,main="Year~mpg01")
+
+car.df %>%
+  ggplot() +
+   geom_point(mapping = aes(x = mpg, y = cylinders, color = mpg01))
+
+boxplot(cylinders~mpg01,car.df,main="cylinders~mpg01")
+
+car.df %>%
+  ggplot() +
+   geom_point(mapping = aes(x = mpg, y = displacement, color = mpg01))
+
+boxplot(displacement~mpg01,car.df,main="displacement~mpg01")
+
+car.df %>%
+  ggplot() +
+   geom_point(mapping = aes(x = mpg, y = horsepower, color = mpg01))
+
+boxplot(horsepower~mpg01,car.df,main="horsepower~mpg01")
+
+car.df %>%
+  ggplot() +
+   geom_point(mapping = aes(x = mpg, y = weight, color = mpg01))
+
+boxplot(weight~mpg01,car.df,main="weight~mpg01")
+
+car.df %>%
+  ggplot() +
+   geom_point(mapping = aes(x = mpg, y = acceleration, color = mpg01))
+
+boxplot(acceleration~mpg01,car.df,main="acceleration~mpg01")
+
+car.df %>%
+  ggplot() +
+   geom_point(mapping = aes(x = mpg, y = origin, color = mpg01))
+
+boxplot(origin~mpg01,car.df,main="origin~mpg01")
+
+# 
+# car.df %>%
+#   filter(mpg01 == 0) %>%
+#   ggplot(mapping = aes(x = mpg01, y = year)) +
+#   geom_boxplot()
+# 
+# 
+# car.df %>%
+#   filter(mpg01 != 0) %>%
+#   ggplot(mapping = aes(x = mpg01, y = year)) +
+#   geom_boxplot()
+# 
+
+# ggplot(data = car.df) +
+#   geom_point(mapping = aes(x = mpg01, y = year, size = cylinders))
+
+sprintf("Features : year, cylinders, displacement, horsepower, weight, origin")
+
+# c) Split the data into training and test
+
+# car.df %>%
+#   group_by(year) %>%
+#   summarize(n())
+
+train <- (car.df$year <= 78)
+# train.Y <- car.df[train, "mpg01"]
+# test.Y <- car.df[!train, "mpg01"]
+train.Y <- car.df[train, ]$mpg01
+test.Y <- car.df[!train, ]$mpg01
+test.X <- car.df[!train, ]
+
+# d) Perform LDA
+lda.fit <- MASS::lda(mpg01 ~ year + cylinders + displacement + horsepower + weight + origin, data = car.df,family = binomial, subset = train)
+
+# lets predict on test data using the model:
+lda.pred <- predict(lda.fit, test.X, type =  "response")
+
+stopifnot(length (lda.pred$class) == length(test.Y))
+(confusion_table <- table(lda.pred$class, test.Y))
+
+# Null classifier:
+sprintf("LDA: Null classifier : %s ", (13+83)/(17+1+13+83) )
+
+# overall fraction of correct predictions:
+sprintf("LDA: overall fraction of correct predictions: %s", mean(lda.pred$class == test.Y))
+
+# FP rate:
+sprintf("LDA: FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("LDA: TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("LDA: precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("LDA: specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+sprintf("test Error is about %s", mean(lda.pred$class != test.Y))
+
+# e) Perform QDA
+qda.fit <- MASS::qda(mpg01 ~ year + cylinders + displacement + horsepower + weight + origin, data = car.df,family = binomial, subset = train)
+
+# lets predict on test data using the model:
+qda.pred <- predict(qda.fit, test.X, type =  "response")
+
+stopifnot(length (qda.pred$class) == length(test.Y))
+(confusion_table <- table(qda.pred$class, test.Y))
+
+# Null classifier:
+sprintf("QDA: Null classifier : %s ",(77+19)/(77+19+1+17) )
+
+# overall fraction of correct predictions:
+sprintf("QDA: overall fraction of correct predictions: %s", mean(qda.pred$class == test.Y))
+
+# FP rate:
+sprintf("QDA: FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("QDA: TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("QDA: precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("QDA: specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+sprintf("test Error is about %s", mean(qda.pred$class != test.Y))
+
+# f) Perform Logistic regrssion
+glm.fit <- glm(mpg01 ~ year + cylinders + displacement + horsepower + weight + origin, data = car.df, family = binomial, subset = train)
+sprintf("summary of logistic regression: ")
+summary(glm.fit)
+
+glm.probs <- predict(glm.fit, test.X, type =  "response")
+
+glm.pred <- ifelse(glm.probs > 0.5, 1, 0)
+
+stopifnot(length(glm.pred) == length(test.Y))
+
+
+(confusion_table <- table(glm.pred, test.Y))
+
+# Null classifier:
+sprintf("Logistic Regression : Null classifier : %s ", (14+82)/(14+82+1+17) )
+
+# overall fraction of correct predictions:
+sprintf("Logistic Regression : overall fraction of correct predictions: %s", mean(glm.pred == test.Y))
+
+# FP rate:
+sprintf("Logistic Regression : FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("Logistic Regression : TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("Logistic Regression : precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("Logistic Regression : specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+sprintf("Logistic Regression : Test Error Rate: %s", mean(glm.pred != test.Y))
+library(pROC)
+roc_obj <- roc(test.Y, glm.probs)
+auc(roc_obj)
+
+# g) Perform KNN 
+# First scale the data 
+str(car.df)
+scaled.car.df <- scale(car.df[, -9])
+colnames(scaled.car.df)
+(helperDF <- tibble(year = car.df$year, mpg01 = car.df$mpg01 , cylinders = scaled.car.df[, "cylinders"], 
+                   displacement = scaled.car.df[, "displacement"], horsepower = scaled.car.df[, "horsepower"], 
+                   weight = scaled.car.df[,"weight"], origin = scaled.car.df[, "origin"]))
+
+train.X <- helperDF[train, c("cylinders", "displacement", "horsepower", "weight", "origin")]
+train.Y <- helperDF[train, ]$mpg01
+test.X <- helperDF[!train, c("cylinders", "displacement", "horsepower", "weight", "origin")]
+test.Y <- helperDF[!train, ]$mpg01
+
+# now do the KNN 
+set.seed(1)
+knn.pred <- class::knn(train.X, test.X, train.Y, k = 15)
+
+(confusion_table <- table (knn.pred, test.Y))
+stopifnot(length (knn.pred) == length(test.Y))
+
+# Null classifier:
+sprintf("KNN: Null classifier : %s ", (24+72)/(24+72+17+1) )
+
+# overall fraction of correct predictions:
+sprintf("KNN: overall fraction of correct predictions: %s", mean(knn.pred == test.Y))
+
+# FP rate:
+sprintf("KNN: FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("KNN: TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("KNN: precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("KNN: specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# test error rate
+sprintf("KNN: Test error rate: %s", mean(knn.pred != test.Y))
+
+
+
+# accumulate errors:
+errors <- c()
+maxK <- 200
+step <- 1
+for(k in seq(1,maxK,step)){
+  knn.pred <- class::knn(train.X, test.X, train.Y, k)
+  (confusion_table <- table (knn.pred, test.Y))
+  errors <- c(mean(knn.pred != test.Y), errors)
+}
+
+data <- cbind(seq(1,maxK,step),errors)
+plot(data,type="l",xlab="k")
+
+```
+
+```{r Exercise 12}
+#a) 
+
+Power <- function(){
+  2 ^ 3
+}
+
+Power()
+
+# b)
+Power2 <- function(x, a) { x^a }
+Power2(2,3)
+
+# c)
+Power2(10,3)
+Power2(8,17)
+Power2(131,3)
+
+# d) 
+Power3 <- function(x, a){
+  result <- x^a
+  return (result)
+}
+
+Power3(2,3)
+
+# e)
+
+x = 1:10
+y = sapply(x,function(x){Power3(x,3)})
+
+plot(x,y,log='x',main='x ~ x^2',type='l')
+
+# f)
+
+PlotPower <- function(x, a){
+
+  y = sapply(x,function(x){Power3(x,a)})
+
+  plot(x,y,log='x',main='x ~ x^a',type='l')
+  
+}
+PlotPower(1:20,4)
+
+```
+
+```{r Exercise 13}
+library(tidyverse)
+library(class)
+boston.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/BostonHousing.csv", 
+                      header=T, stringsAsFactors = T, na.strings = "?")
+boston.df = tibble(boston.df)
+dim(boston.df)
+names(boston.df)
+boston.df <- boston.df %>% 
+  mutate (crim01 = ifelse (crim >= median(crim), 1, 0))
+
+# split the data into test and train 
+train <- (boston.df$age <= 90)
+test.X <- boston.df[!train,]
+test.Y <- boston.df[!train,]$crim01
+train.Y <- boston.df[train,]$crim01
+
+ # first use Logistic refression to calculate P(crime01=1 | X):
+glm.fit <- glm(crim01 ~ . , data = boston.df, family = binomial, subset = train)
+sprintf("summary of logistic regression: ")
+summary(glm.fit)
+
+glm.probs <- predict(glm.fit, test.X, type =  "response")
+
+glm.pred <- ifelse(glm.probs > 0.5, 1, 0)
+
+stopifnot(length(glm.pred) == length(test.Y))
+
+
+(confusion_table <- table(glm.pred, test.Y))
+
+# Null classifier:
+sprintf("Logistic Regression : Null classifier : %s ", (1+143)/(1+143+21+3) )
+
+# overall fraction of correct predictions:
+sprintf("Logistic Regression : overall fraction of correct predictions: %s", mean(glm.pred == test.Y))
+
+# FP rate:
+sprintf("Logistic Regression : FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("Logistic Regression : TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("Logistic Regression : precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("Logistic Regression : specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+sprintf("Logistic Regression : Test Error Rate: %s", mean(glm.pred != test.Y))
+library(pROC)
+roc_obj <- roc(test.Y, glm.probs)
+auc(roc_obj)
+
+# Now lets do the LDA
+lda.fit <- MASS::lda(crim01 ~ . , data = boston.df, family = binomial, subset = train)
+
+# lets predict on test data using the model:
+lda.pred <- predict(lda.fit, test.X, type =  "response")
+
+stopifnot(length (lda.pred$class) == length(test.Y))
+(confusion_table <- table(lda.pred$class, test.Y))
+
+# Null classifier:
+sprintf("LDA: Null classifier : %s ", (36+108)/(36+108+24+0) )
+
+# overall fraction of correct predictions:
+sprintf("LDA: overall fraction of correct predictions: %s", mean(lda.pred$class == test.Y))
+
+# FP rate:
+sprintf("LDA: FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("LDA: TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("LDA: precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("LDA: specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+sprintf("test Error is about %s", mean(lda.pred$class != test.Y))
+library(pROC)
+roc_obj <- roc(test.Y, glm.probs)
+auc(roc_obj)
+
+# Now lets do the KNN
+
+# First scala the predictors
+scaled_boston <- scale(boston.df)
+colnames(scaled_boston)
+helperDF <- tibble(age = boston.df$age, crim01 = boston.df$crim01, 
+                   zn = scaled_boston[,  "zn"], indus = scaled_boston[, "indus"], chas = scaled_boston[, "chas"], 
+                   nox = scaled_boston[, "nox"], rm = scaled_boston[, "rm"], medv = scaled_boston[, "medv" ],
+                   dis = scaled_boston[, "dis"], rad = scaled_boston[, "rad"], tax = scaled_boston[, "tax"], 
+                   ptratio = scaled_boston[, "ptratio"], b = scaled_boston[, "b"], lstat = scaled_boston[, "lstat"])
+
+train.X <- helperDF[train, c("zn", "indus", "chas", "nox", "rm","age","dis","rad","tax","ptratio","b","lstat","medv")]
+train.Y <- helperDF[train, ]$crim01
+test.X <-  helperDF[!train, c("zn", "indus", "chas", "nox", "rm","age","dis","rad","tax","ptratio","b","lstat","medv")]
+test.Y <- helperDF[!train, ]$crim01
+
+set.seed(1)
+knn.pred <- class::knn(train.X, test.X, train.Y, k = 85)
+
+(confusion_table <- table (knn.pred, test.Y))
+stopifnot(length (knn.pred) == length(test.Y))
+
+# Null classifier:
+sprintf("KNN: Null classifier : %s ", (144)/(144+24) )
+
+# overall fraction of correct predictions:
+sprintf("KNN: overall fraction of correct predictions: %s", mean(knn.pred == test.Y))
+
+# FP rate:
+sprintf("KNN: FP rate (TypeI error, 1 - specificity) : %s", confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# TP rate:
+sprintf("KNN: TP rate (1-TypeII error, power, sensetivity, recall) : %s", confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+
+# precision:
+sprintf("KNN: precision: %s", confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+
+# specificity 1-FP/N: 
+sprintf("KNN: specificity 1-FP/N: %s", 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+
+# test error rate
+sprintf("KNN: Test error rate: %s", mean(knn.pred != test.Y))
+
+
+
+# accumulate errors:
+errors <- c()
+maxK <- 100
+step <- 1
+for(k in seq(1,maxK,step)){
+  knn.pred <- class::knn(train.X, test.X, train.Y, k)
+  (confusion_table <- table (knn.pred, test.Y))
+  errors <- c(mean(knn.pred != test.Y), errors)
+}
+
+data <- cbind(seq(1,maxK,step),errors)
+plot(data,type="l",xlab="k")
+
+```
+

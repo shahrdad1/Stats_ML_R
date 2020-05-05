@@ -1,0 +1,492 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+l <- list(x=(1:10), y=rep(NA, 10), logs = log((2:5)))
+l$y
+l[[1]]
+```
+```{r functions}
+exp(0+1i*pi)
+(2 +3i)*(-1i)
+
+z = if(2 < 3) 2 else 3
+
+class(c("a","c"))
+class("ab")
+l <- list(c(1,2,3), "this is an object", "this is a list")
+l[2] == l[[2]]
+
+'<-'(x, c(1,2,3,4,5))
+
+'[<-'(x, 5 , 100)
+x
+'[<-'(x, 6, 120)
+x
+'['(x,4)
+x
+
+'<-'(y,c(11))
+'+'(x,y)
+
+z = 10
+
+f <- function(z) {z = 120; z}
+newz = f(z)
+newz
+z
+
+u <- list(1)
+v <- u
+u[[1]] <- "hat"
+u
+v
+typeof(c(1,2,3))
+is.atomic(c(1,2,3))
+is.atomic(NA)
+
+```
+
+```{r vector and coerse}
+
+typeof(NA)
+is.atomic(NA)
+
+# integer NA 
+typeof(NA_integer_)
+is.atomic(NA_integer_)
+
+# coerce: logical => integer => double => character 
+z <- c(1L,2L,T,F)
+is.atomic(z)
+is.integer(z)
+is.logical(z)
+is.double(z)
+typeof(z)
+"structure of atomic:"
+str(z)
+as.numeric(z)
+
+p <- c("T", T)
+is.atomic(p)
+typeof(p)=="character"
+
+print( "pipe" )
+c(T,F, 1.2) %>% mean
+
+identical(seq(1,5,1) , 1:5)
+str(seq(1,5,1))
+str(1:5)
+
+identical(matrix(1:3, ncol=3), array(1:3, c(1,3)))  
+
+quantiles <- seq(0,1, length.out = 20)
+quantiles
+```
+
+```{r Vectors as key value pairs}
+v1 <- c(a=12, b=13)
+v2 <- c(c=14, v1)
+str(v1)
+str(v2)
+typeof(v2[[1]])
+
+x<-(1:3)
+names(x) <- c("a", "b", "c")
+str(x)
+
+y <- 5:8
+names(y)[[1]] <- c("a")
+names(y)[2] <- c("b")
+
+str(y)
+str(names(y))
+
+z <- 2:5
+z1 <- setNames(z, c("col1", "col2", "col3", "col4"))
+
+str(z1)
+z1["col5"] <- 33
+z2 <- if (is.na(z1["col5"])) c(z1, "col5"=1) else z1["col5"] + 1 # TODO fix this
+z2
+# note: everyting is a vector:
+1 == c(1) 
+1 == c(1)[1]
+1 == c(1)[c(1)]
+```
+
+
+
+```{r lists and unlists}
+t <- list(c(1,2,3,4), "yes this is an element", 12, T)
+# str(t)
+s <- list(list(list(list(-12.3))))
+# str(s)
+typeof(t)
+is.atomic(t)
+s[1]
+
+"-----------"
+x <- list(list(1,2,3), c(T,F), c("as", "pq"))
+
+y <- c(list(1,2,3), c(T,F), c("as", "pq"))
+"-----------"
+str(x)
+"-----------"
+str(y)
+
+unlist(x)
+unlist(y)
+```
+```{r list as key-value pairs}
+
+l1 <- list()
+l1 <- c(name="test", value=12, l1)
+str(l1)
+
+x<-list(1:3, "a value!!", 12.34)
+names(x) <- c("a", "b", "c")
+str(x)
+
+```
+
+```{r Dataframe is a list}
+str(mtcars)
+is.list(mtcars)
+typeof(mtcars)
+lm.cars = lm(mpg ~ wt, data = mtcars)
+typeof(lm.cars)
+is.list(lm.cars)
+is.character(lm.cars)
+
+z = c(1L,2L,3L,4L)
+t = c("a", "b")
+is.vector(z)
+l = list(1,2,3,4, c("a", "b"))
+is.list(z)
+is.character(t)
+is.numeric(t)
+typeof(l)
+class(l)
+typeof(z)
+class(z)
+is.atomic(z)
+is.integer(z)
+length(l)
+attributes(z)
+is.double(c(1, F))
+is.character(c(1,"a"))
+l <- list(1, "a")
+unlist(l)
+typeof(as.vector(l))
+is.logical(NA)
+```
+```{r attributes}
+y <- 1:10
+is.atomic(y)
+attr(y, "Desc") <- "my vainteger atomic vector"
+str(y)
+attr(y,"Desc")
+is.list(attributes(y))
+str(attributes(y))
+z=structure(y, "Desc"="modified attr")
+str(y)
+str(z)
+attributes(y[1])
+attributes(sum(y))
+```
+
+```{r Using a factor instead of a character vector makes it obvious when some groups contain no observations}
+x <- factor(c("a", "b", "a", "c"))
+x
+str(x)
+levels(x)
+levels(x) <- c("a", "b", "c", "d")
+str(x)
+x
+
+sex <- c("m", "m", "m", "m")
+sex_factor <- factor(sex, levels = c("m", "f"))
+table(sex_factor)
+
+
+# Crete a datframe with a factyor in its column
+
+## Generate factor of 3 Levels each has 4 replications
+factorOfLevels <- gl(3,4, labels=letters[1:3])
+factorOfLevels
+
+seq_along(factorOfLevels)
+
+bf <- setNames(factorOfLevels, paste0("row.", seq_along(factorOfLevels)))
+bf
+df  <- data.frame("col.1" = 1, "col.2" = factorOfLevels, "col.3" = gl(4,3))
+df
+dfWithRowNames <- data.frame("col.1" = 1, "col.2" = bf, "col.3" = gl(4,3))
+dfWithRowNames
+
+
+
+f <- factor(letters)
+str(f)
+levels(f)
+levels(f) <- rev(levels(f))
+levels(f)
+str(f)
+"##### We can change the order of factor ###################"
+f <- factor(letters)
+str(f)
+f1 <- rev(factor(letters))
+str(f1)
+f2 <- factor(letters, levels = rev(factor(letters)))
+str(f2)
+```
+
+```{r most data loading functions in R automatically convert character vectors to factors}
+
+# This is suboptimal, because there’s no way for those functions to know the set of all possible levels or their optimal order. 
+# Instead, use the argument stringsAsFactors = FALSE to suppress this behaviour, and then manually convert character vectors to factors using your knowledge of the data.
+
+# note \n is newline which is a separator
+z <- read.csv(text = "value\n12\n1\n.\n9")
+
+# note everything is numeric except the '.' 
+# This '.' causes R thinks the values are not numeric 
+# and thus turn them into a factor
+
+typeof(z$value)
+class(z$value)
+z$value
+as.double(z$value)
+
+# Oops, that's not right: 3 2 1 4 are the levels of a factor, 
+# not the values we read in!
+
+# To fix we use coerce: first convert everyting to character and the to nemeric
+# any non nemwric character cionverts to NA
+as.double(as.character(z$value))
+
+
+# As a second solution we need to deal with '.' when we read it
+
+
+```
+
+```{r matrices}
+m1 <- matrix(1:6, nrow = 3, ncol = 2, byrow = T)
+m1
+dim(m1)
+
+is.matrix(m1)
+is.array(m1)
+m2 <- 1:6
+
+# set dimensions
+dim(m2) <- c(2,3)
+
+# set rownames
+rownames(m2) <- c("1stRow", "2ndRow")
+colnames(m2) <- c("1stCol", "2ndCol", "3rdCol")
+
+str(m2)
+
+rownames(m2)
+nrow(m2)
+ncol(m2)
+
+" transpose"
+m2
+t(m2)
+
+# add a new column to m2 using cbind() AND GET A NEW MATRIX
+m3 <- cbind(m2, "5thCol" = c(7,8))
+m3
+
+# add a new row to m2 and get a new AND GET A NEW MATRIX
+m4 <- rbind(m2 , "3rdRow" = c( 7,8,9))
+m4
+
+m <- cbind(1, 1:7) # the '1' (= shorter vector) is recycled
+m
+n <- cbind(m, 8:14)
+n
+
+m4 <- matrix(1, nrow = 3, ncol = 3)
+cbind(0, m4)
+
+cbind(I = 0, X = rbind(a = 1, b=1:3))
+
+## deparse.level
+dd <- 10
+rbind(1:4, c = 2, "a++" = 10, dd, deparse.level = 0) # middle 2 rownames
+rbind(1:4, c = 2, "a++" = 10, dd, deparse.level = 1) # 3 rownames (default)
+rbind(1:4, c = 2, "a++" = 10, dd, deparse.level = 2) # 4 rownames
+
+```
+```{r list-matrices and list-arrays}
+
+l <- list(1:3, "a", T , 1.0, list("c", 12, c(2,5)), 17)
+listMatrix <- matrix(l, nrow = 3, ncol = 2, byrow = T)
+listMatrix
+str(listMatrix)
+listArray <- array(l , c(2,3))
+str(listArray)
+listArray
+```
+
+```{r atomics are different from row or column matrices and row or column arrays}
+a <- 1:3
+str(a)
+rowMatrix <- matrix(1:3, ncol = 3)
+str(rowMatrix)
+rowArray <- array(1:3, dim=c(1,3))
+str(rowArray)
+
+is.matrix(a) # False
+is.array(a) # False
+is.array(rowMatrix) # True
+is.matrix(rowArray) # True
+```
+
+```{r paste0 stuff}
+paste0(1:12)
+(nth <- paste0(1:12, c("st", "nd", "rd", rep("th", 9))))
+paste0(nth, collapse = ", ")
+paste("1st", "2nd", "3rd", collapse = ", ") # probably not what you wanted
+paste("1st", "2nd", "3rd", sep = ", ")
+
+
+paste(month.abb, "is the", nth, "month of the year.")
+
+## for dealing with long strings.
+strwrap("Stopping distance of cars (ft) vs. speed (mph) from Ezekiel (1930)",width = 30)
+
+(title <- paste(strwrap("Stopping distance of cars (ft) vs. speed (mph) from Ezekiel (1930)",width = 30), collapse = "\n"))
+plot(dist ~ speed, cars, main = title)
+
+
+```
+
+
+```{r}
+x <- runif(1e6)
+y <- list(x,x,x)
+```
+
+
+```{r Dataframes}
+
+df <- data.frame(runif(3), runif(3))
+names(df) <- c(1,2)
+
+
+# creattion using named atomic vector
+#  Use stringsAsFactors = FALSE to prevent R from changing String to factors
+df1 <- data.frame(x=1:3, y=c(100,102,104), z=c("a", "b", "c"), stringsAsFactors = F)
+rownames(df1)
+colnames(df1)
+df1
+df1[2,"y"]
+secondRow <- df1[2,]
+thirdCol <- df1[, "z"]
+
+# create a dataframe and a column being a factor
+# create a 3 level factor each repeating 4 times
+factor3X4 <- gl(3,4, labels=letters[1:3])
+factor3X4
+factor3X4WithNames <- setNames(factor3X4, paste0("o", seq_along(b0)))
+factor3X4WithNames
+df  <- data.frame(a = 1, B = factor3X4, f = gl(4,3))
+df # 12 X 3
+df. <- data.frame(a = 1, B = factor3X4WithNames, f = gl(4,3))
+df. # 12 X 3
+new <- data.frame(a = 8, B ="B", f = "1")
+new # 1 X 3
+(df1  <- rbind(df , new))
+(df.1 <- rbind(df., new))
+
+stopifnot(identical(df1, rbind(df,  new, make.row.names=FALSE)),
+          identical(df1, rbind(df., new, make.row.names=FALSE)))
+
+
+bad <- data.frame(cbind(a = 1:2, b = c("a", "b")))
+str(bad)
+good <- data.frame(a = 1:2, b = c("a", "b"), stringsAsFactors = FALSE)
+str(good)
+"The conversion rules for cbind() are complicated and best avoided by ensuring all inputs are of the same type."
+
+# data frame whose column is a list not a atomic vector
+df0 <- data.frame(x = 1:3)
+df0$y <- list(as.list(5:10), "b", 1:12)
+df0
+str(df0)
+
+# create a dataframe with a list as an element
+df01 <- data.frame(x=1:3, y= I(list(p = 1:3, q=c("a", "b"), r=as.list(1:10))))
+df01
+str(df01)
+df01[1, "y"]
+
+# length is size of the encompassing list
+length(df1)
+" names() and columnames() are the same"
+names(df1)
+colnames(df1)
+
+row.names(df1)
+rownames(df1)
+str(df1)
+is.data.frame(df1)
+class(df1)
+
+# coerce 
+"use as.datafrme and vector creates one column dataframe"
+df3 <- as.data.frame(c(1,2,3,4))
+colnames(df3) <- c("col1")
+df3
+
+" use as.datafrme and list to create a column named DF"
+df2 <- as.data.frame(list(`col1` = c(1,2,3,4), `col2`=c("a1","a2", "a3", "a4"), 'col3'="b", `col4`=T, 'col5'=list("a", 12)))
+row.names(df2)
+df2
+
+df4 <- as.data.frame(matrix(1:25 , nrow = 5, ncol = 5))
+row.names(df4)
+colnames(df4)
+df4
+# change the column names
+colnames(df4) <- c("col1","col2","col3","col4")
+df4
+
+```
+
+```{r multidimensional arrays}
+
+" Four dimensional array"
+a = array((1:36), dim=c(2,3,2,3))
+dimnames(a) <- list(c("innerRow1","innerRow2"), c("innerCol1", "innerCol2", "innerCol3"), c("row1", "row2"), c("col1", "col2", "col3"))
+
+
+" dimensions of a "
+dimnames(a)
+
+" dim of a"
+dim(a)
+
+"length of a"
+length(a)
+
+"Here is a"
+a
+
+#    | 1   3   5 | 13   15   17 |  25   27  29 |
+#    | 2   4   6 | 14   16   18 |  26   28  30 |
+#    ------------------------------------------
+#    | 7   9  11 | 19   21   23 | 31   33   35 |
+#    | 8  10  12 | 20   22   24 | 32   34   36 |
+
+
+```
+

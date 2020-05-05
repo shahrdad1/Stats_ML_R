@@ -1,0 +1,76 @@
+---
+title: "R Advancer R Control flow"
+output: html_notebook
+---
+
+```{r 'ifelse' is vectorized 'if' , NAs are propagated into output}
+Sys.setenv("_R_CHECK_LENGTH_1_CONDITION_" = "true")
+# if(c(T,F)) "Yes" else "No"
+
+x <- c(2,3,5,4,NA,6,7,NA, 8,10,NA, 11,13,15)
+ifelse(x%%2==0, "Even", as.character(x))
+
+# dplyr::case_when works better
+dplyr::case_when(
+  x%%2==0 ~ "Even",
+  x%%3==0 ~ "Odd",
+  x%%5==0 ~ "Funny",
+  is.na(x) ~ "Not applicable",
+  T ~ "default value",
+)
+
+```
+
+```{r Exercise 5.2.4}
+#1 
+ifelse(T, 1, "no") # integer
+ifelse(F, 1, "no") # charactr vecotr
+ifelse(NA, 1, "no")
+
+#2 
+x<-1:10
+
+# Numeric  is coerced to logical NA does not
+if(length(x)) "Not empty" else "empty"
+if(length(numeric())) "Not empty" else "empty"
+if(1.2) T else F
+if(NaN) "True" else "False"
+if(NA) "True" else "False"
+
+```
+```{r for loops}
+x <- c(1,2,3,4,5)
+for (i in x){
+  if(i%%5 == 0){
+    print(paste0("value of i is :", i, " break the loop"))
+    break
+  } else {
+    print(paste0("value of i is :", i))
+  }
+}
+
+
+# If you want to save values produced in vector , preallocate a list
+
+x <- c(1, 50, 20)
+result <- vector("list", length(x))
+for (i in seq_along(x)){
+  result[[i]] <- rnorm(10, x[[i]])
+}
+result
+
+
+# Always use seq_along when looping over collections of S3 objects
+dates <- as.Date(c("2012-01-01", "2012-02-01", "2012-11-23"))
+for (i in seq_along(dates))
+  print(dates[[i]])
+
+x <- numeric()
+outs <- vector("list", 0)
+outs[1] <- x[1]
+outs
+stopifnot(numeric() == vector("double", length=0))
+stopifnot(numeric(3) == vector("double", length=3))
+
+```
+

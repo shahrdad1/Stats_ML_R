@@ -1,0 +1,246 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r object identifiier}
+x <- c(1,2,3,4)
+y <- c(1,2,3,4)
+
+z<- y
+lobstr::obj_addr(x)
+lobstr::obj_addr(y)
+lobstr::obj_addr(z)
+lobstr::obj_addr(y) == lobstr::obj_addr(z)
+
+lobstr::obj_addr(mean)
+lobstr::obj_addr(base::mean)
+lobstr::obj_addr(get("mean"))
+lobstr::obj_addr(evalq(mean))
+lobstr::obj_addr(match.fun("mean"))
+
+?read.csv
+make.names(.122323) 
+
+```
+
+```{r copy-on-modify on vectors}
+
+x <- c(1,2,3)
+cat(tracemem(x), "\n")
+x[[1]] <- 12
+x[[1]] <- 13L
+lobstr::obj_addr(x)
+y <- x
+lobstr::obj_addr(x)
+lobstr::obj_addr(y)
+y[[3]] <- 4
+lobstr::obj_addr(y)
+y
+y[[2]] <- 5
+y
+y[[3]] <- 12L
+lobstr::obj_addr(y)
+untracemem(x)
+" No copy will happen insie function because no value changes inside it"
+x <- c(1,2,3)
+cat(tracemem(x), "\n")
+f <- function(a){
+  a
+}
+z <- f(x)
+```
+
+
+```{r copy on modify on lists}
+l1 <- list(1,2,3)
+l2 <- l1
+lobstr::obj_addr(l1)
+lobstr::obj_addr(l2)
+l2 [[3]] <- 4
+lobstr::obj_addr(l2)
+lobstr::ref(l1,l2)
+
+```
+
+```{r copy on modify on Dataframes}
+d1 <- data.frame(x=c(1,5,6), y = c(2,4,3))
+d2 <- d1
+" Before changing the column"
+lobstr::obj_addr(d1)
+lobstr::obj_addr(d2)
+d2[, 2] <- d2[, 2] * 2
+" After changing the column"
+lobstr::obj_addr(d1)
+lobstr::obj_addr(d2)
+lobstr::ref(d1,d2)
+
+d3 <- d1
+"Before changing a row"
+lobstr::obj_addr(d1)
+lobstr::obj_addr(d3)
+
+d3[2, ] <- c(12,13)
+"After changing a row"
+lobstr::obj_addr(d1)
+lobstr::obj_addr(d3)
+lobstr::ref(d1,d3)
+```
+
+```{r character vector}
+x <- c("abc", "df", "efgh")
+lobstr::ref(x, character=T)
+```
+```{r one copy happens}
+x1 <- c(1,2,3)
+cat(tracemem(x1), "\n")
+x1[[3]] <- 4L
+untracemem(x1)
+```
+
+```{r two copy happens}
+x2 <- c(1L, 2L, 3L)
+cat(tracemem(x2), "\n")
+x2[[3]] = 4
+untracemem(x2)
+```
+
+```{r self refrential list}
+l3 <- list(1:10)
+lobstr::obj_addr(l3) # pointer to first element in the list
+lobstr::obj_addr(l3[[1]]) #pointer to first element of vector 1:10
+l3[[1]][10] # element in 10th position of vector 1:10 
+" Self refrential"
+lobstr::ref(l3) 
+l3[[2]] <- l3
+lobstr::ref(l3)
+l3[[2]][1]
+```
+
+```{r objectr size}
+lobstr::obj_size(letters)
+
+lobstr::obj_size(ggplot2::diamonds)
+
+x<- runif(1e6)
+class(x)
+lobstr::obj_size(x)
+l <- list(x,x,x)
+lobstr::obj_size(l)
+lobstr::obj_size(list(NULL,NULL,NULL))
+
+lobstr::obj_sizes(x) + lobstr::obj_sizes(l)
+lobstr::obj_size(x,l)
+lobstr::obj_size(1:3)
+lobstr::obj_size(1:10)
+
+?object.size()
+y <- rep(list(runif(1e4)), 100)
+object.size(y)
+lobstr::obj_size(y) # smaller because list consists of pointers to values, so it takes into account only size of each pointer
+
+# list of functions
+func <- list(mean, sd, var)
+object.size(func)
+lobstr::obj_size(func)
+class(mean)
+
+a <- runif(1e6)
+lobstr::obj_size(a)
+
+b<-list(a,a)
+lobstr::obj_size(b)
+lobstr::obj_size(a, b)
+
+# modify b
+b[[1]][[1]] <- 10
+lobstr::obj_size(b)
+lobstr::obj_size(a, b)
+
+# modify b again
+b[[1]][[1]] <- 10
+lobstr::obj_size(b)
+lobstr::obj_size(a, b)
+
+```
+
+```{r modify in place}
+
+v <- c(1,2,3)
+lobstr::obj_addr(v)
+cat(tracemem(v), "\n")
+
+v[[3]] <- 4
+lobstr::obj_addr(v)
+
+
+
+```
+
+```{r for loops are slow in R}
+"on each iteration of the loop refeence to each indidual columns in dataframe is copied"
+x <- data.frame(matrix(runif(5 * 1e4), ncol = 5))
+cat(tracemem(x), "\n")
+medians <- vapply(x, median, numeric(1))
+print ("medians are calculated")
+for ( i in seq_along(medians)){
+  print(i)
+  x[[i]] <- x[[i]] - medians[[i]]
+}
+untracemem(x)
+```
+
+```{r modifying list does not copy references do its faster}
+x <- data.frame(matrix(runif(5 * 1e4), ncol = 5))
+y <- as.list(x)
+
+cat(tracemem(y), "\n")
+medians <- vapply(y, median, FUN.VALUE = numeric(1))
+print("medians are calculated")
+for (i in seq_along(medians)){
+  print(i)
+  y[[i]] <- y[[i]] - medians[[i]]
+}
+untracemem(y)
+```
+```{r environment is always modified in place}
+e1 <- rlang::env(a = 1, b = 3, c = 3)
+e2 <- e1
+e1
+e2
+e1$a <- 12
+e1
+e2
+```
+```{r}
+x <- list()
+cat(tracemem(x), "\n")
+lobstr::obj_addr(x)
+x[[1]] <- x
+untracemem(x)
+```
+```{r profiling}
+f1 <- function (df){
+  medians <- vapply(df, median, numeric(1))
+  for (i in seq_along(medians)){
+    df[[i]] <- df[[i]] - medians[[i]]
+  }
+}
+ 
+f2 <- function(l){
+  medians <- vapply(l , median, numeric(1))
+  for (i in seq_along(medians)){
+    l[[i]] <- l[[i]] - medians[[i]]
+  }
+}  
+
+df <- data.frame(matrix(50*runif(1e5), ncol = 50))
+
+# do the profiling 
+print("dataframe bench mark:")
+bench::bench_time(f1(df))
+print("List bench mark:")
+bench::bench_time(f2(as.list(df)))  
+
+
+```
+

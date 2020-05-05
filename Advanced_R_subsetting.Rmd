@@ -1,0 +1,439 @@
+---
+title: "Advancer R Subsettings"
+output: html_notebook
+---
+
+```{r Subsetting atomic vector and lists I.e list subsetting}
+x <- c(2.1, 4.2, 3.3, 5.4)
+x[c(4,3,1)]
+x[c(1,1,1,3,3,4,4)]
+x[-c(4,2,1)]
+stopifnot(-c(1,2,3)==c(-1,-2,-3))
+x[c(T,T,F)] # recyclying rule applied: shorter one is recycled to the length of longer
+# avoid recycling rule when shorter vector is larger than 1
+
+sprintf("recycling only applied to logicals: " )
+x[T]
+x[1]
+
+x[c(T,T,NA,T)]
+x[c(NA, NA)]
+
+y <- setNames(x, letters[1:4])
+y[c("d", "e")]
+y[c("b","b","b","b")]
+
+# names must match exactly for subsetting using '['
+y[c("aa","bb")]
+
+
+# avoid subsetting with factors , R does not use factor's level, it uses its underlying integer value
+
+stopifnot(y[factor("a")] == y[c(1)])
+
+
+
+```
+```{r subsetting matrices i.e matrix subsettings [..,..] }
+a <- matrix(1:6, nrow = 3)
+
+" Matrix subsetting I.e [..,..] "
+
+colnames(a) = c("A", "B")
+sprintf("3x2 matrix a:")
+a
+
+sprintf("a[1:2, ] :")
+a[1:2,]
+
+sprintf("a[c(2,2,3), c(2,2,1)] :")
+a[c(2,2,3), c(2,2,1)]
+
+sprintf("a[-c(1,3), ] :")
+a[-c(1,3), ]
+
+sprintf("a[, c(F,T)] :")
+a[, c(F,T)]
+
+sprintf("a matrix of T and F can be used for selection")
+a[matrix(c(T,T,F,T,F,T), nrow = 3)]
+
+sprintf("We can seubset elements of a matrix using matrix of indices of its elements: ")
+m <- outer(1:9, 1:9, FUN = "paste", sep=",")
+n <- min(nrow(m), ncol(m))
+idx <- cbind(seq_len(n), seq_len(n))
+idx
+m[idx]
+
+
+sprintf("recycling only applied to logicals: " )
+a[T,]
+
+
+sprintf("a[c(T,F,T), c(\"B\", \"A\")] :")
+a[c(T,F,T), c("B", "A")]
+
+sprintf("a[0, -2] : " )
+a[0, -2]
+
+
+# applying list subsetting to array or matrix assumes 
+# matrix or array is one long 1D vector stored column by column
+sprintf("Subset a matrix or array with single vector as if they are 1D vectors: ")
+vals <- outer (1:5, 1:5, FUN="paste", sep=",")
+vals
+sprintf ("pich elements 1 and 15 from the matrix vied as a long array: ")
+vals[c(1, 15)]
+
+# loosing a dimension whn using a single value for each dimension
+sprintf("a[1,1] is automatically converted to a named atomic vector::")
+a[1,1]
+
+sprintf("a[1, ] is automatically converted to a named atomic vector:")
+a[1, ]
+a[c(1), ]
+stopifnot(a[1, ] == a[c(1), ])
+str(a[c(1), ])
+sprintf("upper triangle: ")
+m1 <- matrix(1:9, nrow = 3)
+m1[upper.tri(m1)]
+
+
+```
+```{r subsettings Tibbles }
+
+df <- tibble(x=1:3, y=3:1, z=letters[1:3])
+
+# matrix subsetting:
+
+df[df$x == 2,]
+df[c(1,1,1,2,3), ]
+df[, c(1,1,1,2,3)]
+df[df$x == 2 | df$z == "c", ]
+df[df$x == 3 | df$z == "a", c(2,3)]
+
+# choose the columns by column names
+df[,c("x", "z")] 
+
+# List subsetting
+df[c(1,1,1,2,3)]
+
+# choose the columns by column names with single index
+df[c("x", "z")]
+
+# list or matrix subsetting a tible always returns a tibble, no loosing dimension
+str(df["x"])
+str(df[, "x"])
+
+
+df1 <- data.frame(x=1:3, y=3:1, z=letters[1:3])
+
+df1[,c(1,1,1,2,3)]
+df1[c(1,1,1,2,3)]
+# list subsetting a dataframe using a single column returns a dataframe 
+str(df1["x"])
+
+# matrix subsetting a dataframe using a single column returns a vector (loosing dimension) unless we set drop=False
+str(df1[,"x"])
+
+# matrix subsettinga matrix behaves similarily: it reduces the dimension:
+m <- matrix(1:9, nrow = 3)
+m
+str(m[,2])
+
+```
+```{r factor subsetting and drop}
+
+z <- factor(c("a", "a", "b"))
+z[3]
+z[3, drop=T]
+
+```
+```{r list with [[ chooses the element inside while [ chooses }
+l <- list(1:3, "a", 4:6)
+sprintf("[1] returns first element wrapped in a list")
+str(l[1])
+sprintf("[[1]] returns first element in a list")
+str(l[[1]])
+l[[1]][2]
+
+```
+
+```{r logical vectors are recycled to the same length as the vector being subset}
+x <- (1:5)
+x[NA]
+x[NA_real_]
+
+m <- outer(1:9, 1:9, FUN = "paste", sep=",")
+n <- min(nrow(m), ncol(m))
+tuple <- function(xx,yy){
+  list(xx,yy)
+}
+lv <- Vectorize(tuple)
+indices <- outer(1:n, 1:n, FUN = lv)
+indices
+```
+```{r $ vs [[ }
+
+l <- list(x=1:3, y=letters[1:3])
+sprintf("[1] returns a list contains first element in the original list")
+is.list(l[1])
+is.integer(l[1])
+sprintf("[[1]] returns first element within the list")
+is.integer(l[[1]])
+
+sprintf("[[]] is the same as $ except $ does partial matching from left to right")
+x <- list(abc=1)
+x$a
+x[["a"]]
+
+# To prevent this set :
+options(warnPartialMatchDollar=T)
+
+sprintf(" Dataframes are list of vectors so $ does partial matching, Use Tibbles to prevent this")
+
+is.integer(1:3)[1]
+is.integer(1:3)[[1]]
+```
+
+```{r missing and OOB indices and purr::pluck}
+sprintf("0 length object: NULL, logical()")
+sprintf("Missing value: NA_integer_")
+str(logical())
+
+atomic <- 1:3
+names(atomic) = c("a", "b", "c")
+# atomic[[NULL]] # Error attempt to select less than one element in get1index
+# atomic[[c()]] # Error attempt to select less than one element in get1index
+# atomic[[logical()]] # Error attempt to select less than one element in get1index
+# atomic[[4]] # Error subscript out of bounds
+# atomic[["d"]] #Error in atomic[["d"]] : subscript out of bounds
+# atomic[[NA_integer_]] # Error in atomic[[NA_integer_]] : subscript out of bounds
+
+theList <- as.list((1:3))
+theList.names = c("a", "b", "c")
+# theList[[NULL]] # Error attempt to select less than one element in get1index
+# theList[[c()]] # Error attempt to select less than one element in get1index
+# theList[[logical()]] # Error attempt to select less than one element in get1index
+# theList[[4]] # Error subscript out of bounds
+theList[["d"]] #NULL
+theList[[NA_integer_]] # NULL
+
+sprintf("purr::pluck is suitable tool for nested structures that may miss parts:")
+x <-list(a=list(1,2,3),
+         b = list(3,4,5))
+
+purrr::pluck(x,"a",1)
+purrr::pluck(x, "c", 2)
+purrr::pluck(x, "c", 2, .default = NA)
+```
+
+```{r Subassignments}
+x <- 1:5
+x[c(1,2)] <- c(100, 101)
+x
+
+sprintf ("Remove an element from the list: ")
+x <- list(a = 1, b = 2)
+x[["b"]] <- NULL
+x
+
+sprintf ("append an element from the list: ")
+
+l1 <- c(x, list(c=3))
+l1
+
+# sprintf("change value of ama element in list to NULL (keep the structure of the list)")
+# l1["c"] <- list(NULL)
+# l1
+# is.data.frame(mtcars)
+# is.list(mtcars)
+# nrow(mtcars)
+# sprintf("keeping the structure of list while changing the content:")
+# mtcars[] <- lapply(mtcars, as.integer)
+# is.data.frame(mtcars)
+# str (mtcars)
+# nrow(mtcars)
+# sprintf("loosing the structure of list, changing the content:")
+# mtcars <- lapply(mtcars, as.integer)
+# is.list(mtcars)
+# str (mtcars)
+  
+```
+
+```{r subsetting applications }
+library(tidyverse)
+sprintf("Lookups: ")
+values <- c("m", "m", "u", "f", "f")
+lookup <- list(m="male", f="female", u="NA")
+values1 <- lookup[values]
+names(values1) = NULL
+values1
+
+sprintf("More complex lookups using match")
+info_table <- tibble(grade=3:1, desc=c("Excel","Good","Poor"), fail=c(F,F,T))
+info_table
+?match
+grades <- c(1,2,2,3,1)
+matched_rows = match(grades, info_table$grade)
+sprintf("now pick the selected rows that matched from dataframe: ")
+info_table [matched_rows, ]
+
+# another example of match
+vals <- c("abc", "cda", "arf", "w2e3", "fvfef","gdec", "eyhwre", "rthyh", "kykve")
+match(c("arf",  "fvfef", "eyhwre", "wffr"), vals)
+
+
+# random sampling from a dataframe
+df <- tibble(x=c(1,2,3,1,2), y=5:1, z=letters[1:5])
+df
+aPermutationOfRowIndices <- sample(nrow(df))
+df[aPermutationOfRowIndices,]
+
+threeRandomRows <- sample(nrow(df), 3)
+df[threeRandomRows, ]
+
+# Bootstrap
+
+sprintf("selects 6 bootstrap with replicates:")
+bootstrapRowIndices <- sample (nrow(df), 10, replace=T)
+bootstrapRowIndices
+df[bootstrapRowIndices, ]
+
+# Order 
+
+sprintf("order function gets a vector (not a list) as input and ordere its indices based on its content and returns it")
+x <- c("b", "c", "a")
+order(x)
+x[order(x)]
+
+# Order a dataframe
+df[order(df$z),]
+
+# Order a dataframe over one column descending and remove all records with NA
+dfWithNa <- rbind(df, tibble(x=c(NA,12,13), y=c(0, -1, -2), z=c("z", NA,NA)))
+dfWithNa
+dfWithNa[order(dfWithNa$z,na.last = T,decreasing = T), ]
+dfWithNa[, order(names(dfWithNa),decreasing = T)]
+```
+
+```{r Expanding Aggregated columns (identical columns shrank into one with a count column to show repeation times)}
+
+df <- dplyr::tibble(x=c(2,4,1), y=c(9,11,6), n=c(3,5,1))
+df
+sprintf("rep(x, y) vecotorization function repeates x[i] , y[i] times")
+rep(1:nrow(df), df$n) 
+df[rep(1:nrow(df), df$n), ]
+
+```
+
+```{r selecting rows based on a logical condition and "which"}
+library(tidyverse)
+df <- dplyr::tibble(x=c(2,4,1), y=c(9,11,6), n=c(3,5,1))
+df
+logical <- df$x > 2 | df$n >= 3
+sprintf("filter rows based on a logical condtion")
+filteredDf <- df[logical, ]
+filteredDf
+sprintf("index of the rows that are kept in df: ")
+which(logical)
+sprintf("index of the rows that are filtered out: ")
+which(!logical) 
+
+# another usage:
+condition <- sample(10) < 4
+condition
+which(condition)
+
+# When there is NA
+sprintf("When there is NA in data, the logical condition generates NA:")
+x <- c( 1,2,3,NA,5,NA,7, 8)
+x[x%%2==0]
+
+sprintf("When there is NA in data, 'which' drops NA:")
+logical <- x%%2==0
+x[which(logical)]
+
+sprintf("which returns 0 when logical returns a vector of False")
+logicalFalse <- x>100
+which(logicalFalse)
+x[-which(logicalFalse)]
+
+
+
+```
+```{r boolean vs set operations}
+x1 <- 1:10 %% 2 == 0
+x2 <- which(x1)
+
+y1 <- 1:10 %% 5 ==0
+y2 <- which(y1)
+
+sprintf("Intersection: & <=> intersect")
+x1 & y1
+intersect(x2 , y2)
+
+sprintf("union: | <=> union")
+x1 | y1
+union(x2, y2)
+
+sprintf("diff: X & !Y <=> setdiff(x, y)")
+x1 & !y1
+setdiff(x2, y2)
+
+sprintf("xor (X, Y) <=> setdiff(union(X, Y), intersect(X, Y))")
+xor(x1, y1)
+setdiff(union(x2, y2), intersect(x2, y2))
+```
+
+```{r 4.3.5 Exercises}
+# 1
+head(mtcars)
+mtcars[["cyl"]][[3]]
+mtcars[3,"cyl"]
+mtcars[, "cyl"][[3]]
+mtcars[3,][["cyl"]]
+with(mtcars, cyl[[3]])
+
+# 2
+mod <- lm(mpg ~ wt, data = mtcars)
+mod.summary <- summary(mod)
+str(mod.summary)
+names(mod.summary)
+
+mod.summary[["df"]]
+mod.summary$r.squared
+
+```
+
+
+```{r Exercise 4.5.9}
+
+# 1
+df <- dplyr::tibble(x1=1:5, x2=letters[1:5], x3=12:16, x4=letters[18:22], x5=-12:-8)
+
+# permute columns
+df[sample(ncol(df))]
+
+# permute columns and rows in one step
+df[sample(nrow(df)), sample(ncol(df))]
+
+# 2
+m <- 4
+df[sample(m), ]
+
+
+# Choose a block of 10 ontigues records which starts at random place
+df <- dplyr::tibble(x1=1:50, x2=sample(100:149), x3=12:61, x4=2:51)
+
+m <- 10
+startIndex <- sample(nrow(df) - m + 1, 1)
+endIndex <- start + m - 1
+df[startIndex : endIndex, ]
+
+# 3
+df[order(colnames(df), decreasing = T)]
+
+
+```
+

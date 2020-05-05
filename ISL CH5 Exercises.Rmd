@@ -1,0 +1,272 @@
+---
+title: "ISL-Ch5 Exercises"
+output: html_notebook
+---
+
+```{r sample()}
+library(tidyverse)
+set.seed(1)
+x <- 1:12
+# a random permutation
+is.integer(sample(x))
+# bootstrap resampling -- only if length(x) > 1 !
+sample(x, replace = TRUE)
+
+# 100 Bernoulli trials
+sample(c(0,1), 100, replace = TRUE)
+
+# create divide a dataframe into folds using samples:
+
+(theDf <- tibble(x=1:56))
+k = 10
+folds <- sample(1:k, size = nrow(theDf), replace = T) #10 fold CV
+table(folds)
+
+# folds with same size
+sameSizefolds <- sample(rep(1:k, length.out = nrow(theDf)), size = nrow(theDf), replace = F)
+table(sameSizefolds)
+
+# train data set
+theDf[folds != 3, ]
+
+# test data set 
+theDf[folds == 3, ]
+
+
+
+## More careful bootstrapping --  Consider this when using sample()
+## programmatically (i.e., in your function or simulation)!
+
+# sample()'s surprise -- example
+# x <- 1:10
+#     sample(x[x >  8]) # length 2
+#     sample(x[x >  9]) # oops -- length 10: If x has length 1, is numeric and x >= 1, sampling via sample takes place from 1:x
+#     sample(x[x > 10]) # length 0
+# 
+# ## safer version:
+# x[sample.int(length(x)) >  8] # length 2
+# x[sample.int(length(x)) >  9] # length 1
+# x[sample.int(length(x)) >  10] # length 0
+# 
+# ## R 3.x.y only
+# sample.int(1e10, 12, replace = TRUE)
+# sample.int(1e10, 12) # not that there is much chance of duplicates
+
+```
+
+
+```{r deplyr sample}
+library(tidyverse)
+# Sample fixed number per group
+auto.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Auto.csv", header=T, stringsAsFactors = T, na.strings = "?")
+
+(auto.df = as_tibble(auto.df))
+(by_cyl <- auto.df %>% 
+  group_by(year))
+
+sample_n(auto.df, 10)
+sample_n(auto.df, 50, replace = TRUE)
+sample_n(auto.df, 10, weight = as.integer(mpg))
+
+sample_n(by_cyl, 3)
+sample_n(by_cyl, 10, replace = TRUE)
+sample_n(by_cyl, 3, weight = mpg / mean(mpg))
+
+# Sample fixed fraction per group
+# Default is to sample all data = randomly resample rows
+sample_frac(auto.df)
+
+sample_frac(auto.df, 0.1)
+sample_frac(auto.df, 1.5, replace = TRUE)
+sample_frac(auto.df, 0.1, weight = 1 / mpg)
+
+sample_frac(by_cyl, 0.2)
+sample_frac(by_cyl, 1, replace = TRUE)
+
+```
+
+
+
+```{r Validation set approach}
+library(tidyverse)
+
+auto.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Auto.csv", header=T, stringsAsFactors = T, na.strings = "?")
+(auto.df = as_tibble(auto.df))
+
+# Check a particular column that has NA and include the record
+# dfSubsetWithNaInOneCol <- auto.df[is.na(auto.df$Directions), ]
+# head(dfSubsetWithNaInOneCol)
+
+# get a subset of records in dataframe with no NA in any column:
+auto.df <- auto.df[rowSums(is.na(auto.df)) == 0, ]
+
+# Now find a subset of records that have at least one NA 
+auto.df[rowSums(is.na(auto.df)) > 0,]
+
+set.seed(1)
+
+train <- sample(dim(auto.df)[1],196) # choose a sample of size 196 from row indices of dataframe auto.df
+
+lm.fit <- lm(mpg ~ horsepower, data = auto.df, subset = train)
+
+# test error MSE
+mean((auto.df$mpg - predict(lm.fit, auto.df))[-train]^2, na.rm = T) 
+
+# claculate test.mse for polynimial regression
+
+lm.fit2 <- lm(mpg~poly(horsepower, 2), data=auto.df, subset = train)
+
+# test error MSE
+mean((auto.df$mpg - predict(lm.fit2, auto.df))[-train]^2, na.rm = T) 
+
+# claculate test.mse for  cubic regression
+
+lm.fit3 <- lm(mpg~poly(horsepower, 3), data=auto.df, subset = train)
+
+# test error MSE
+mean((auto.df$mpg - predict(lm.fit3, auto.df))[-train]^2, na.rm = T) 
+
+# if we sample again and create another traing sample MSE values will be different
+train <- sample(dim(auto.df)[1],196) # choose a sample of size 196 from row indices of dataframe auto.df
+
+lm.fit <- lm(mpg ~ horsepower, data = auto.df, subset = train)
+
+# test error MSE
+mean((auto.df$mpg - predict(lm.fit, auto.df))[-train]^2, na.rm = T) 
+
+# claculate test.mse for polynimial regression
+
+lm.fit2 <- lm(mpg~poly(horsepower, 2), data=auto.df, subset = train)
+
+# test error MSE
+mean((auto.df$mpg - predict(lm.fit2, auto.df))[-train]^2, na.rm = T) 
+
+# claculate test.mse for  cubic regression
+
+lm.fit3 <- lm(mpg~poly(horsepower, 3), data=auto.df, subset = train)
+
+# test error MSE
+mean((auto.df$mpg - predict(lm.fit3, auto.df))[-train]^2, na.rm = T) 
+
+
+```
+
+```{r LOOCV }
+library(tidyverse)
+library(boot)
+
+auto.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Auto.csv", header=T, stringsAsFactors = T, na.strings = "?")
+auto.df = as_tibble(auto.df)
+
+# remove NAs
+# is.na(auto.df)
+is.matrix(is.na(auto.df))
+# rowSums(is.na(auto.df))
+
+auto.df <- auto.df[rowSums(is.na(auto.df)) == 0,]
+
+# now fit the data on the whole data
+glm.fit <- glm(mpg ~ horsepower, data = auto.df)
+
+cv.err <- cv.glm(auto.df, glm.fit)
+str(cv.err)
+cv.err$delta
+
+
+# redo this for polynomials and save the results in a vector
+cv.error <- NULL
+for (i in 1:5){
+  glm.fit <- glm(mpg ~ poly(horsepower,i), data = auto.df)
+  cv.error <- rbind(cv.error, cv.glm(auto.df, glm.fit)$delta)
+}
+cv.error
+```
+
+```{r K-fold cross validation for classification }
+library(tidyverse)
+library(class)
+library(boot)
+
+set.seed(17)
+weekly.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
+                      header=T, stringsAsFactors = T, na.strings = "?")
+weekly.df = tibble(weekly.df)
+
+# create k-fold 
+k <- 10
+threshold <- 0.5
+
+folds <- sample(1:k, size = nrow(weekly.df), replace = T) #10 fold CV
+table(folds)
+
+# folds with same size
+# sameSizefolds <- sample(rep(1:k, length.out = nrow(weekly.df)), size = nrow(weekly.df), replace = F)
+# table(sameSizefolds)
+
+# Run the model by making the model on 9 folds and predicting on the hold out:
+
+results <- lapply(1:k, function(x){  # x is the index of test portion, the rest are for training
+  glm.fit <- glm(Direction ~ Lag2, data = weekly.df[folds != x,], family = binomial)
+  glm.probs <- predict(glm.fit, weekly.df[folds == x,], type =  "response")
+  # since contrasts(weekly.df$Direction) shows dummy variable 1 asigned to 'Up'
+  # and since P(y=1|x) is glm.probs what we get is prosterior of probability of 'Up' case
+  glm.pred <- ifelse(glm.probs > threshold, "Up", "Down")
+  return(data.frame(probs = glm.probs, predicted = glm.pred, real = weekly.df[folds == x, ]$Direction ))
+})
+
+# calculate confusion table and other measeres
+
+missclassificationRate = NULL
+nullClassificationRate = NULL
+FP_rates = NULL
+TP_rates = NULL
+precisions = NULL
+specificities = NULL
+confusionTables = NULL
+aucs = NULL
+
+library(pROC)
+
+for( df in results){
+  confusion_table <- table(df$predicted, df$real)
+  
+  nullClassifier <- max(
+    (confusion_table[1,1] + confusion_table[2,1])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ), 
+    (confusion_table[1,2] + confusion_table[2,2])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ))
+  
+  nullClassificationRate <- c(nullClassificationRate, nullClassifier)
+  
+  roc_obj <- roc(df$real, df$probs)
+  aucs <- c(aucs, auc(roc_obj))
+
+  confusionTables  <- cbind(confusionTables, confusion_table)
+  missclassificationRate <- c(missclassificationRate, mean(df$predicted != df$real))
+  FP_rates <- c(FP_rates, confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+  TP_rates <- c(TP_rates, confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+  precisions <- c(precisions, confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+  specificities <- c(specificities , 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]) )
+
+  # overall fraction of wrong predictions:
+  # print(confusion_table)
+}
+
+# average missclassification error rate
+sprintf("Logistic Regression : Missclassification error rate : %s", mean(missclassificationRate))
+
+sprintf("Logistic regression : Null Classifier: %s", mean(nullClassificationRate))
+
+sprintf("Logistic Regression AUC: %s", mean (aucs))
+# FP rate:
+sprintf("Logistic Regression : FP rate (TypeI error, 1 - specificity) : %s", mean(FP_rates))
+
+# TP rate:
+sprintf("Logistic Regression : TP rate (1-TypeII error, power, sensetivity, recall) : %s", mean(TP_rates))
+
+# precision:
+sprintf("Logistic Regression : precision: %s", mean(precisions))
+
+# specificity 1-FP/N:
+sprintf("Logistic Regression : specificity 1-FP/N: %s", mean(specificities))
+
+```
+

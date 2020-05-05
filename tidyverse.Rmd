@@ -1,0 +1,104 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r auto arrange by horsepower, paged.print=TRUE}
+# Exercise 8 #
+library(tidyverse)
+library(edr)
+auto.df = read.csv("/Users/shahrdadshadab/env/pycharm_projects/sketch_pad/my-R-project/ISLR/Data/Auto.csv", header=T, na.strings = "?")
+str(auto)
+
+auto.lm = lm(mpg ~ horsepower, data = auto)
+summary(auto.lm)
+```
+
+
+```{r paged.print=TRUE}
+auto.tible <- as_tibble(auto)
+filter(auto.tible, name == "plymouth satellite custom")
+auto.tible
+filter(auto.df, year %in% c(90,80) & name %in% c("amc rebel sst", "chevrolet impala"))
+filter(auto.df, name %in% c("amc rebel sst", "impala"))
+```
+
+
+```{r tibble create a ne dataframe, paged.print=TRUE}
+
+tibble(
+  a = c(1,2,3,4),
+  b = c("a", "b", "g", "d")
+)
+
+tibble(a=c(1), b = c("a", "b", "c", "d"))
+tibble(a=NA_integer_, b = c("aefef", "b", "c", "d")) # Na column is of type Integer
+
+t = tribble(~a, ~b, 3, "a", 4, NA, 5, NA, NA, 100)
+str(t)
+ t %>% 
+   filter (is.na(b) & !is.na(a)) %>%
+   select(-a)
+
+ 
+df =  data.frame(replicate=rep(c(1:3),4), treatment=rep(c("a", "b", NA, "d", NA, "e") ,2) , specilas=exp(1:12))
+df %>%
+  select(-replicate) %>%
+  filter(!is.na(treatment)) %>%
+  group_by(treatment)  %>%
+  summarise(specials_mean=mean(specilas)) %>%
+  mutate(log_mean = log(specials_mean)) %>%
+  arrange(desc(specials_mean))
+
+result = (df$replicate[!is.na(df$treatment) & df$specilas < 5] == df %>% filter(!is.na(treatment) & specilas < 5) %>% select (replicate))
+result
+
+```
+
+```{r arrange and mutate, paged.print=TRUE}
+arrange(auto.tible, desc(year), mpg)
+auto1 <- select(auto, mpg, cylinders, displacement, horsepower, weight)
+auto2 <- mutate(auto1, weight_mean=mean(weight), mpg_per_cylender=round(mpg/cylinders, 3.0))
+class(select(auto, mpg))
+```
+```{r group_by_summarize_mean}
+
+by_year <- group_by(auto.df, year)
+average_weight <- summarize(by_year, weight_mean = mean(weight, na.rm = TRUE))
+average_weight
+
+# pipe operators # 
+grp_by_year_cylender <- auto.df %>%
+                        select(mpg, cylinders, year, origin, acceleration) %>%
+                        filter(year %in% 70:73) %>%
+                        group_by(cylinders, year, origin) %>%
+                        summarise(mpg_mean = mean(mpg, na.rm = TRUE), acceleration_mean = mean(acceleration, na.rm = TRUE)) %>%
+                        arrange(desc (mpg_mean), acceleration_mean) %>%
+                        select(year, mpg_mean, acceleration_mean)
+
+
+grp_by_year_cylender
+
+```
+
+
+```{r}
+require(graphics)
+
+# create a plotting structure
+# pts <- list(x = cars[,1], y = cars[,2])
+# plot(pts)
+x <- list(a = 1:10, beta = exp(-3:3), logic = c(TRUE,FALSE,FALSE,TRUE))
+x
+#cars[,1]
+#lapply(x, mean)
+#lapply(x, quantile, probs = 1:3/4)
+sapply(x, quantile)
+#i39 <- sapply(3:9, seq) # list of vectors
+#sapply(i39, fivenum)
+#vapply(i39, fivenum, c(Min. = 0, "1st Qu." = 0, Median = 0, "3rd Qu." = 0, Max. = 0))
+
+```
+
+

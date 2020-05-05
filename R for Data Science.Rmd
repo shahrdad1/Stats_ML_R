@@ -1,0 +1,600 @@
+---
+title: "R for Data science"
+output: html_notebook
+---
+
+
+```{r Data filter}
+library(nycflights13)
+library(tidyverse)
+
+str(flights)
+
+# filter() are combined with “and”: every expression must be true in order
+# for a row to be included in the output
+
+(jan1 <- filter(flights, month==1 , day == 1))
+
+# use near for double value equalities
+near (sqrt(2) ^ 2 , 2)
+
+(jan1 <- filter(flights, month==11 | month == 12))
+# equivalently
+jan1 <- filter(flights, month %in% c(11,12))
+
+# filter excludes both FALSE and NA values
+df <- tibble(x = c(1, NA, 3))
+filter(df, x>1)
+filter(df, is.na(x) | x > 1)
+
+# Exercise 5.2.4
+#Find all flights that:
+  # Had an arrival delay of two or more hours
+filter(flights, arr_delay >= 2)
+  #Flew to Houston (IAH or HOU)
+filter(flights, dest %in% c("IAH", "HOU"))
+  #Were operated by United, American, or Delta
+filter(flights, carrier %in% c("UA", "AM", "DEL"))
+  # Departed in summer (July, August, and September)
+filter(flights, month %in% c(7, 8, 9))
+  # Arrived more than two hours late, but didn’t leave late
+filter(flights, dep_delay <= 0 & arr_delay >= 120)
+flights[between(flights$dep_delay,0, 120), ]
+  # Were delayed by at least an hour, but made up over 30 minutes in flight
+filter(flights, dep_delay > 60 & arr_delay <= 30)
+  # Departed between midnight and 6am (inclusive)
+filter(flights, dep_time <= 600)
+
+#How many flights have a missing dep_time
+paste0(nrow(filter(flights, is.na(dep_time))), " flights have missing dep_time value")
+
+# complete.cases gives TRUE when all values in a row are not NA
+flights[!complete.cases(flights), ]
+# columns that have NA
+colnames(flights[!complete.cases(flights), ])
+?complete.cases
+
+# Arrange rows by getting a set of column names (or more complicated expressions) to order by
+arrange(flights, year, month, desc(day))
+
+# Missing values are always sorted at the end:
+df <- tibble(x = c(5,2,NA))
+arrange(df, x)
+
+# 5.3.1 Exercises
+
+# Sort missing values in the start
+arrange(df, desc(is.na(x)), x)
+
+# Sort flights to find the most delayed flights. 
+arrange(flights, desc(dep_delay))[1,]
+
+
+# Find the flights that left earliest.
+arrange(flights, dep_time)[1,]
+
+# Sort flights to find the fastest flights.
+arrange(flights, distance/air_time)[1,]
+
+#  Which travelled the shortest?
+arrange(flights, distance)[1,]
+
+# Which flights travelled the farthest?
+arrange(flights, desc(distance))[1,]
+
+```
+```{r Select columns }
+library(nycflights13)
+library(tidyverse)
+
+select(flights, year, month, day)
+
+# Select all columns between year and day (inclusive)
+select(flights, year:day)
+
+# Select all columns except those from year to day (inclusive)
+select(flights, -(year:day))
+
+# select all columns whose name contains string "ela"
+select(flights, contains("ela"))
+
+# select all columns whose name ends with "_time"
+select(flights, ends_with("_time"))
+
+# rename a column
+rename(flights, departure_time=dep_time, arrival_time = arr_time)
+
+#  handful of variables you’d like to move to the start of the data frame.
+select(flights, dep_time, arr_time, sched_dep_time, sched_arr_time, everything())
+
+# 5.4.1 Exercises
+
+# Brainstorm as many ways as possible to select dep_time, dep_delay, arr_time, and arr_delay from flights.
+
+select(flights, dep_time, dep_delay, arr_time, arr_delay)
+select(flights, starts_with("dep_") | starts_with("arr_"))
+select(flights, starts_with("dep_")  & (ends_with("_delay") | ends_with("_time")) 
+       | starts_with("arr_")  & (ends_with("_delay") | ends_with("_time")))
+
+# What happens if you include the name of a variable multiple times in a select() call?
+select(flights, dep_time, dep_time, dep_time, arr_delay)
+
+# What does the one_of() function do? Why might it be helpful in conjunction with this vector?
+cols <- c("dep_time","XXX","dep_delay","ZZZ","QQQ","arr_delay")
+select(flights, one_of(cols))
+
+# case insensetivity is surprising
+select(flights, contains("TIME", ignore.case = F))
+```
+
+
+```{r Add new columns with mutate() using vectorized functions}
+library(nycflights13)
+library(tidyverse)
+
+# mutate() always adds new columns at the end of your dataset so we’ll start by creating a narrower dataset so we can see the new variables.
+
+flights_small <- select(flights, year:day, ends_with("delay"), distance, air_time)
+# view(flights_small)
+
+flights_small
+
+mutate(flights, gain = dep_delay - arr_delay, gain_per_hour = gain/hour, 
+       speed = distance/air_time *60)
+
+# If you only want to keep the new variables, use transmute()
+transmute(flights, gain = dep_delay - arr_delay, gain_per_hour = gain/hour, 
+       speed = distance/air_time *60)
+
+# function must be vectorised to be able to use in mutate
+
+# Modular arithmetic: %/% (integer division) and %% (remainder) are vectorized
+transmute(flights, hour = dep_time %/% 100, min = dep_time %% 100)
+
+# log() functions are also vectorize
+transmute(flights, gain = dep_delay - arr_delay, gain_per_hour = gain/hour, logOfGain = log2(gain_per_hour))
+
+# lead() and lag() allows you to compute running differences (e.g. x - lag(x)) or 
+# find when values change (x != lag(x)). 
+
+(x <- 1:10)
+lag(x)
+lead(x)
+transmute(flights, dest, lag(dest), lead(dest))
+
+# Cumulative and rolling aggregates (i.e. a sum computed over a rolling window): 
+# R => cumsum(), cumprod(), cummin(), cummax(); 
+(x <- 1:10)
+cumsum(x)
+cumprod(x)
+cummin(x)
+cummax(x)
+
+# dplyr => cummean() for cumulative means
+cummean(x)
+
+# For Rolling aggregates use RcppRoll package
+x <- matrix(rnorm(100),nrow=50,ncol=2)
+x
+RcppRoll::roll_sum(x,12)
+
+# ranking (basically report the indices of elements if they were sorted, NA and INF goes to the end)
+x <- c(5, 1, 3,Inf, 2, 2, NA) # => (1,2,2,3,5,Inf,NA)
+row_number(x)
+min_rank(x)
+dense_rank(x)
+percent_rank(x) # a number between 0 and 1 computed by rescaling min_rank to [0, 1]
+cume_dist(x)  #a cumulative distribution function. Proportion of all values less than or equal to the current rank
+
+# ntile creates a rough rank, which breaks the input vector into n buckets
+ntile(x, 2) 
+ntile(runif(100), 10)
+
+
+# 5.5.2 Exercises
+
+# Convert dep_time and sched_dep_time to a more convenient representation of number of minutes since midnight
+
+#flights[order(flights$dep_time, na.last = T,decreasing = T), ]
+flights1 <- mutate(flights, dep_time_minute = (dep_time%/%100) * 60 + dep_time%%100, sched_dep_time_minute = (sched_dep_time%/%100) * 60 + sched_dep_time%%100)
+select (flights1,year,month, day,dep_time, dep_time_minute, sched_dep_time, sched_dep_time_minute, everything())
+
+# Compare air_time with arr_time - dep_time. What do you expect to see? What do you see? What do you need to do to fix it?
+fixed_air_time_flights <- transmute (flights, arr_time, dep_time, air_time, fixed_air_time_minute = abs( ((arr_time%/%100)*60+arr_time%%100) - ((dep_time%/%100)*60+dep_time%%100) ), fixed_air_time =  (fixed_air_time_minute%/%60)*100 + (fixed_air_time_minute%%60))
+fixed_air_time_flights[order(fixed_air_time_flights$fixed_air_time), ]
+filter(fixed_air_time_flights, arr_time <= dep_time)
+
+# Compare dep_time, sched_dep_time, and dep_delay. How would you expect those three numbers to be related?
+transmute(flights, dep_time, sched_dep_time, dep_delay, dep_delay_fixed =  dep_time - sched_dep_time )
+
+# Find the 10 most delayed flights using a ranking function. How do you want to handle ties? Carefully read the documentation for min_rank()
+filter (flights , min_rank(desc(dep_delay)) <= 10)
+
+flights[order(flights$dep_delay, decreasing = T), ]
+
+```
+```{r summarize with group_by}
+
+library(nycflights13)
+library(tidyverse)
+
+# summarize() with group_by() changes the unit of analysis from the complete dataset to individual groups. 
+# Then, when you use the dplyr verbs on a grouped data frame they’ll be automatically applied “by group”
+
+(by_day <- group_by(flights, year, month, day))
+str(attributes(by_day))
+
+# delay by day
+summarise(by_day, delay = mean(dep_delay, na.rm = T))
+
+
+```
+
+```{r Combining multiple operations with the pipe}
+library(nycflights13)
+library(tidyverse)
+
+
+# Explore the relationship between the distance and average delay for each location
+delay <- flights %>%
+  group_by(dest) %>%
+  summarise(count = n(), dist = mean(distance, na.rm = T), delay = mean(arr_delay, na.rm = T)) %>%
+  filter(count > 20 & dest != "HNL")
+
+ggplot(data = delay, mapping = aes(x = dist, y = delay))+
+  geom_point(aes(size=count), alpha=1/3)+
+  geom_smooth(se=F)
+
+# compare it with:
+# by_destination <- group_by(flights, dest)
+# (avgDelayByDest <- summarise(by_destination, count = n(), dist = mean(distance, na.rm = T), delay = mean(arr_delay, na.rm = T)))
+# (delay <- filter(avgDelayByDest, count > 20 & dest != "HNL"))
+
+```
+
+```{r count }
+library(nycflights13)
+library(tidyverse)
+
+# count missing values in arr_delay
+missing_arr_delay <- flights %>%
+  filter(is.na(arr_delay) | is.na(dep_delay)) %>%
+  group_by(arr_delay) %>%
+  summarise(count = n())
+  
+sprintf("Number of records with missing arr_delay or dep_delay: %d",missing_arr_delay$count)
+
+# Remove records with missing arr_delay or dep_delay
+(not_cancelled <- flights %>%
+  filter(!is.na(arr_delay) & !is.na(dep_delay))
+)
+
+# let’s look at the planes (identified by their tail number) that have the highest average delays:
+
+delays <- not_cancelled %>%
+  group_by(tailnum) %>%
+  summarise(delay = mean(arr_delay)) 
+
+ggplot(data = delays, mapping = aes(x = delay)) +
+  geom_freqpoly(binwidth = 10)
+  
+# Wow, there are some planes that have an average delay of 5 hours (300 minutes)!
+# Let's draw a scatterplot of number of flights vs. average delay:
+
+(delays1 <- not_cancelled %>%
+  group_by(tailnum) %>%
+  summarise(count = n(), delay = mean (arr_delay))
+)
+
+# filter(delays1 , is.na(delay) | is.na(count))
+delays1 %>%
+  # it’s often useful to filter out the groups with the smallest numbers of observations to see patterns more clearly
+  filter (count > 50) %>% 
+  ggplot(mapping = aes(x=count, y=delay))+
+  geom_point(alpha=1/10)
+
+# ANORTHER EXAMPLE:
+# When I plot the skill of the batter (measured by the batting average, ba) against the number of opportunities to hit the ball 
+# (measured by at bat, ab), you see two patterns:
+
+batting <- as_tibble(Lahman::Batting)
+(batters <- batting %>%
+  group_by(playerID) %>%
+  summarise(ba = sum(H, na.rm = T)/sum(AB, na.rm = T), ab = sum(AB, na.rm = T))
+)
+
+# Variation in our aggregate decreases as we get more data points.
+# There’s a positive correlation between skill (ba) and opportunities to hit the ball (ab).
+
+batters %>% 
+ filter (ab > 100) %>%
+  ggplot(mapping = aes(x=ab, y = ba)) +
+  geom_point()+
+  geom_smooth(se=F)
+
+# If you naively sort on desc(ba), the people with the best batting averages are clearly lucky, not skilled:
+
+batters %>%
+  arrange(desc(ba))
+```
+```{r Summary functions: mean(), n(), sum(), median(), sd(), IQR(), mad()}
+# sum(x > 10) can take a logical expression that filters in certain records and then it adds them (sum of bunch of T and F values)
+# mean (x > 60) can filters in records whose column 'x' value is greater than 60 and  then calculate the mean of x for filtered records
+# Measures of location: mean(x), median(x) (Half of the values of x is less than median(x) and other half is greater)
+# Measures of spread: sd(x), IQR(x), mad(x)
+# Measures of rank: min(x), quantile(x, 0.25), max(x)
+# Measures of position: first(x), nth(x, 2), last(x). These work similarly to x[1], x[2], and x[length(x)] but let you set a default value if that position does not exist (i.e. you’re trying to get the 3rd element from a group that only has two elements).
+
+# Counts: 
+#   n() : returns the size of the current group. 
+#   count(x) : counts number of repeatitions of each element in a qualitative column x
+#   sum(!is.na(x)) : number of non-missing values in current group
+#   n_distinct(x) : number of distinct (unique) values in current group
+
+# Counts and proportions of logical values: sum(x > 10), mean(y == 0)
+
+# quantile(x, 0.25) will find a value of x that is greater than 25% of the values, and less than the remaining 75%.
+# IQR is 3rd Quartile - 1st Quartile (i.e the box plot)
+# mad is median absolute deviation mad(x) may be more useful if you have outliers
+
+
+library(nycflights13)
+library(tidyverse)
+
+(not_cancelled <- flights %>%
+  filter(!is.na(arr_delay) & !is.na(dep_delay))
+)
+
+(not_cancelled %>% 
+  group_by(year, month, day) %>%
+  summarise(avg_arr_delay = mean(arr_delay), avg_pos_arr_delay = mean(arr_delay[arr_delay > 0]))
+)
+
+
+not_cancelled %>%
+  group_by(dest) %>%
+  summarise(distance_sd = sd(distance)) %>%
+  arrange(desc(distance_sd))
+
+not_cancelled %>%
+  group_by(year, month, day) %>%
+  summarise(first = min(dep_time), last=max(dep_time))
+
+not_cancelled %>%
+  group_by(year, month, day) %>%
+  summarise(first_dep = first(dep_time), last_dep = last(dep_time))
+
+# Filtering on ranks gives you all variables, with each observation in a separate row:
+not_cancelled %>%
+  group_by(year, month, day) %>%
+  mutate(rank = min_rank(desc(dep_time))) %>%
+  filter(rank %in% range(rank))
+  
+# which destination have the most carriers
+not_cancelled %>%
+  filter(!is.na(dest) & !is.na(carrier)) %>%
+  group_by(dest) %>%
+  summarize(max_carriers = max(n_distinct(carrier))) %>%
+  arrange(desc(max_carriers))
+
+# Give a count of each destinations separately
+not_cancelled %>%
+  count(dest)
+
+
+# You can optionally provide a weight variable. 
+# “count” (sum) the total number of miles a plane flew:
+
+not_cancelled %>%
+  count(tailnum, wt=distance)
+
+# Whcih is the same as 
+not_cancelled %>%
+  group_by(tailnum) %>%
+  summarise(n=sum(distance))
+
+
+# How many flights left before 5am?
+not_cancelled %>% 
+  group_by(year, month, day) %>% 
+  summarise(n_early = sum(dep_time < 500))
+
+# What proportion of flights are delayed by more than an hour?
+not_cancelled %>% 
+  group_by(year, month, day) %>%
+  summarize(proportion = mean(arr_delay > 60))
+```
+
+```{r 5.6.5 When you group by multiple variables, each summary peels off one level of the grouping}
+library(nycflights13)
+library(tidyverse)
+
+(per_day <- flights %>%
+  group_by(year, month, day) %>%
+   summarise(flights=n())
+)
+
+(per_month <- per_day %>%
+  summarize(flights = sum(flights)))
+
+(per_year <- per_month %>%
+    summarize(flights = sum(flights)))
+  
+# Equivalently
+
+(per_day <- flights %>%
+  group_by(year, month, day) %>%
+   summarise(per_day_flights=n()) %>%
+    summarise(per_month_flights = sum(per_day_flights)) %>%
+    summarise(per_year_flights = sum(per_month_flights))
+)
+# Be careful when progressively rolling up summaries: it’s OK for sums and counts, but you need to think about weighting means and variances, and it’s not possible to do it exactly for rank-based statistics like the median
+# I.e. the sum of groupwise sums is the overall sum, but the median of groupwise medians is not the overall median.
+
+# If you need to remove grouping, and return to operations on ungrouped data, use ungroup()
+daily <- group_by(flights, year, month, day)
+
+daily %>%
+  ungroup() %>% # no longer grouped by year-month-day
+  summarise(flights = n())
+
+```
+```{r 5.6.7 Exercises}
+library(nycflights13)
+library(tidyverse)
+
+not_cancelled <- flights %>% 
+  filter(!is.na(arr_delay) & (!is.na(dep_delay)))
+# 1)
+# A flight is 15 minutes early 50% of the time, and 15 minutes late 50% of the time.
+(not_cancelled %>%
+    group_by(flight) %>%
+    summarize(total = n(), 
+              early15 = sum(arr_delay == -15), 
+              late15 = sum (arr_delay == 15)) %>%
+    filter(total != 0 & early15 != 0 & late15 != 0 &  near(total / 2, 0.5))
+
+  )
+
+
+# Another way :
+(not_cancelled %>%
+    group_by(flight) %>%
+    summarize(total = n(), 
+              early15 = mean(arr_delay == -15, na.rm = T), 
+              late15 = mean (arr_delay == 15, na.rm = T)) %>%
+    filter(total != 0 & early15 == 0.5 & late15 == 0.5)
+
+  )
+
+# A flight is always 10 minutes late.
+(not_cancelled %>%
+    group_by(flight) %>%
+    filter (arr_delay == 10)
+)
+
+# 99% of the time a flight is on time. 1% of the time it’s 2 hours late.
+
+not_cancelled %>%
+    group_by(flight) %>%
+    summarize (total = n(), ontime = sum(arr_delay == 0), late = sum(arr_delay == 2)) %>% 
+  filter((ontime %/% total)*100 == 99 && (late %/% total)*100 == 1)
+
+# 2) 
+#  not_cancelled %>% count(dest) 
+not_cancelled %>% 
+  group_by(dest) %>%
+  summarise(n = n())
+
+
+# not_cancelled %>% count(tailnum, wt = distance) 
+not_cancelled %>%
+  group_by(tailnum) %>%
+  summarise(wt = sum(distance))
+ 
+# 4) 
+# Look at the number of cancelled flights per day. Is there a pattern? Is the proportion of cancelled flights related to the average delay?
+
+flights %>%
+  group_by(year, month, day) %>%
+  summarize(cancelledFlights = sum(is.na(arr_delay) | (is.na(dep_delay))),
+            avgArrDelay = mean(is.na(arr_delay), na.rm = T)) %>%
+  arrange(desc(avgArrDelay)) %>%
+  filter(cancelledFlights <= 75) %>%
+  ggplot(mapping = aes(x=cancelledFlights, y = avgArrDelay)) +
+  geom_point()+
+  geom_smooth(se=F)
+  
+# 5)
+# Which carrier has the worst delays? 
+# Challenge: can you disentangle the effects of bad airports vs. bad carriers? Why/why not? 
+# (Hint: think about flights %>% group_by(carrier, dest) %>% summarise(n()))
+
+
+# not_cancelled %>%
+#   group_by(carrier, dest) %>%
+#    summarise(max_delay_per_dest = max(arr_delay, na.rm = T)) %>%
+#      summarise(max_delay_per_carr = max(max_delay_per_dest, na.rm = T)) %>%
+#   arrange(desc(max_delay_per_carr))
+
+not_cancelled %>%
+  group_by(carrier, dest) %>%
+  summarise(max_delay_per_dest = max(arr_delay, na.rm = T)) %>%
+  group_by(dest) %>%
+  mutate(rank = min_rank(desc(max_delay_per_dest))) %>%
+  filter(rank %in% range(rank)) %>%
+  arrange(carrier, dest)
+
+# 6) What does the sort argument to count() do?
+not_cancelled %>% 
+  count(tailnum, wt = distance, sort = T) 
+
+# assume we want to count (number, letter) pair
+(data = tibble(
+  letter = sample(LETTERS, 50000, replace = TRUE),
+  number = sample (1:10, 50000, replace = TRUE)
+  ))
+
+data %>% 
+  count(letter, number, sort = TRUE)
+
+data %>% 
+  group_by(letter, number) %>% 
+  summarise(n = n()) %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+
+data %>% 
+  count(letter, number) %>% 
+  ungroup() %>% 
+  arrange(desc(n))
+```
+```{r group_by with mutate() and filter()}
+library(nycflights13)
+library(tidyverse)
+
+# Find the worst members of each group
+flights %>%
+  group_by(year, month, day) %>%
+  filter(rank(desc(arr_delay)) < 4)
+
+(r1 <- rank(x1 <- c(3, 1, 4, 15, 92)))
+(r2 <- min_rank(x1 <- c(3, 1, 4, 15, 92)))
+
+# Find all groups bigger than a threshold
+(poular_dests <-
+  flights %>%
+  group_by(dest) %>%
+  filter(n() > 365))
+
+# A grouped filter is a grouped mutate followed by an ungrouped filter. I generally avoid them except for quick and dirty manipulations: otherwise it’s hard to check that you’ve done the manipulation correctly.
+
+poular_dests %>%
+  filter(arr_delay > 0) %>%
+  mutate(prop_delay = arr_delay / sum(arr_delay)) %>%
+  select(year:day, dest, arr_delay, prop_delay)
+
+
+
+```
+```{r Exercises 5.7.1}
+# 1) 
+# Filter function is appalied to each group and shrinks the elements of each group 
+flights %>%
+  group_by(year, month, day) %>%
+  filter (air_time == 320 & carrier=="US")
+
+# mutate function with group
+# Arithmetic operators with group_by
+flights %>%
+  
+ 
+```
+
+```{r}
+
+#Functions that work most naturally in grouped mutates and filters are known as window functions (vs. the summary functions used for summaries). You can learn more about useful window functions in the corresponding vignette: vignette("window-functions")
+
+vignette("window-functions")
+```
+

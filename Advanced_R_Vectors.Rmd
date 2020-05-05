@@ -1,0 +1,629 @@
+---
+title: "Advancer R Vectors"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+
+```{r two family of data types: "Vector" and "Node"}
+
+print("N stands for Node and V stands for Vector")
+gc()
+```
+```{r all naked numbers are atomic vectors of type double (or integer if L is apeneded to it)}
+
+# naked numbers
+stopifnot(identical (1[[1]] , 1[1]) )
+stopifnot(identical (12 , 12[1]) )
+stopifnot(identical (1L, 1L[1]) )
+stopifnot(identical (1e6 , 1e6[1]) )
+stopifnot(identical (0xcafe, 0xcafe[1]) )
+
+# naked characters
+stopifnot(identical("abc", 'abc') )
+stopifnot(identical ("sp12"[1], "sp12") )
+stopifnot(identical ("sp12"[1], 'sp12') )
+stopifnot(identical ('abcd'[1], 'abcd') )
+
+# naked logicals
+stopifnot(identical (T[1], T) )
+# Inf, -Inf, NaN are doubles
+stopifnot(is.double(-Inf) )
+stopifnot(is.double(Inf) )
+stopifnot(is.double(NaN) )
+stopifnot(is.double(0xabc1) )
+stopifnot(is.integer(0xabc1L) )
+stopifnot(is.double(1) )
+stopifnot(is.double(1e4) )
+stopifnot(is.integer(1e4L) )
+stopifnot(is.double(NULL) )
+```
+```{r combine}
+c("1,2,3", "4,5,6")
+c("1,2,3"[1], "4,5,6"[1])
+```
+
+
+```{r dont use mode and storage.mode, use typeof}
+print("------ logical -------")
+z <- c(T,T,F)
+typeof(z)
+length(z)
+str(z)
+
+print("------ Character ------")
+y <- c("abs", "cde")
+typeof(y)
+length(y)
+str(y)
+
+print("------ double -------")
+x <- c(1,2,3)
+typeof(x)
+length(x)
+str(x)
+
+print("------- list -------")
+l <- list(1,2,3)
+typeof(l)
+length(l)
+str(l)
+
+print("------ matrix -------")
+m <- matrix(3*runif(3))
+typeof(m)
+str(m)
+length(m[1])
+
+print("------- Dataframe------")
+df <- as.data.frame(x)
+typeof(df)
+str(df)
+typeof(df[[1]])
+length(df[[1]])
+length(df)
+
+```
+
+```{r NA shows Missing values , NaN used when mathematcaly undefined}
+
+"Except follwoing expression, any other expression involving NA returns NA"
+NA ^ 0
+NA | T
+NA & F
+
+NA & T
+NA | F
+
+" Propagation of missingness causes x == NA returns NA"
+x <- c(1,2,3)
+x == NA
+
+
+print("Use is.na")
+x <- c(1, NA, 2, NA)
+is.na(x)
+
+stopifnot( identical(NaN , Inf/Inf) )
+
+print (" Every calculation in R is in Real numbers unless explicitly coerced to complex numbers")
+stopifnot( identical(sqrt(-1), NaN))
+
+```
+
+```{r avoid is.atomic, is.vector, is.numeric}
+c("a", 1)
+str(c("a", 1))
+
+# Failed coercion causes a warning and misiing value
+l <- as.integer(c("a", 1, T))
+l
+as.integer(c(T, "a"))
+as.integer(c(T, F))
+
+print ("coercion order: Logical -> Integer -> Double -> Character") 
+
+c(1,FALSE)
+c(1L, "a")
+c(1L,1)
+c("T", T)
+c(TRUE, 1L)
+
+```
+
+```{r attr(), attributes() and structure()}
+
+print("set / get value of a single attribute using attr() ")
+x <- c(1,2,3)
+attr(x, "object desc.") <- "an integer vector called x"
+attr(x,"object desc.")
+attr(x, "created by:") <- "me"
+attr(x,"created by:")
+
+print("get all attributes using attributes()")
+str(attributes(x))
+
+print("set multiple attributes using structure")
+y <- c("a","b","c")
+a <- structure(y, "name" = "array consists of a,b,c", "length" = "three")
+str(attributes(a))
+
+y[1] # an operation removes the attributes
+str(attributes(y))
+```
+
+```{r names and dim are two attributes that stay even when you change the object}
+
+x <- c(a = 1, b = 2, c = 3)
+stopifnot(attr(x,"namrs") == names(x))
+print("attributes of x: ")
+str(attributes(x))
+y <- c(1,2,3)
+# set the name attributes of y
+names (y) <- c("a", "b", "c")
+
+stopifnot(identical(x,y))
+
+# another way of setting names
+z <- setNames(1:3, c("a", "b", "c"))
+str(attributes(z))
+
+print("Missing names can be either NA or \"\" ")
+r <- c(1,2,3,4)
+names(r) <- c("first", "second", "")
+names(r)
+r["second"]
+
+```
+```{r array and matrices are in fact atomic vectors with dim attribute}
+m <- matrix (1:6, nrow = 2, ncol = 3)
+m1 <- 1:6
+dim(m1) <- c(2,3)
+nrow(m1)
+print("attributes of a matrix")
+str(attributes(m1))
+stopifnot(identical(m1, m))
+
+a1 <- array(1:27, c(3,3,3))
+a2 <- 1:27
+dim(a2) <- c(3,3,3)
+
+print("array does not have dimnames")
+dimnames(a1)
+
+print("attributes of a three dimensional array")
+str(attributes(a2))
+stopifnot(identical(a1, a2))
+
+print("atomic vector does nothave dimensions")
+dim(c(1,2,3))
+
+m2 <- 1:6
+
+# set dimensions
+dim(m2) <- c(2,3)
+
+# set rownames
+rownames(m2) <- c("1stRow", "2ndRow")
+colnames(m2) <- c("1stCol", "2ndCol", "3rdCol")
+
+print("matrix with named rows and columns")
+str(attributes(m2))
+
+rownames(m2)
+nrow(m2)
+ncol(m2)
+
+" transpose"
+m2
+t(m2)
+```
+
+
+```{r rbind() and cbind() to add rows and columns to a matrix}
+
+m2 <- matrix(1:6, nrow = 3, ncol = 2)
+rownames(m2) <- c("r1", "r2", "r3")
+colnames(m2) <- c("c1", "c2")
+" add a new column to m2 using cbind() AND GET A NEW MATRIX"
+m2
+m3 <- cbind(m2, "c3" = c(7,8,9))
+m3
+
+"add a new row to m2 and get a new AND GET A NEW MATRIX"
+m2
+m4 <- rbind(m2 , "r3" = c(10, 11))
+m4
+
+"'1' (= shorter vector) is recycled (repeated 7 times in first column) to be able to append 1:7 as second column"
+m <- cbind(1, 1:7) 
+m
+
+"'5' is repeated 7 times in first row to be ablse to append 8:14 to the second row"
+n <- rbind(5, 8:14)
+n
+
+" Create a matrix using recycling 1 9 times"
+I <- matrix(1, nrow = 3, ncol = 3)
+I
+
+" 0 is repeated as many times as I's rows to be able to append I's columns to it "
+I1 <- cbind(0, I)
+I1
+
+" 0 is repeated as many as rows of X in a column name called 'c1' in order to append rows a and b of matrix X to it "
+I2 <- cbind(c1 = 0, X = rbind(a = 1, b=1:3))
+I2 
+
+## deparse.level
+dd <- 10
+rbind(1:4, c = 2, "a++" = 10, dd, deparse.level = 0) # middle 2 rownames
+rbind(1:4, c = 2, "a++" = 10, dd, deparse.level = 1) # 3 rownames (default)
+rbind(1:4, c = 2, "a++" = 10, dd, deparse.level = 2) # 4 rownames
+```
+```{r preallocating vector and list}
+
+sprintf ("create empty list")
+l <- vector("list", length=0)
+str(l)
+
+l <- vector("logical", length = 0)
+str(l)
+l <- vector("integer", length = 3)
+str(l)
+l <- vector("character", length = 3)
+str(l)
+
+l <- vector("list", length=4)
+str(l)
+
+stopifnot(numeric() == vector("double", length=0))
+stopifnot(numeric(3) == vector("double", length=3))
+
+stopifnot(character(3) == vector("character", length=3))
+stopifnot(logical(3) == vector("logical", length=3))
+stopifnot(integer(3) == vector("integer", length=3))
+stopifnot(complex(3) == vector("complex", length=3))
+stopifnot(raw(3) == vector("raw", length=3))
+
+
+# Zero indexing for atomic and list
+stopifnot(list()[1]==list())
+stopifnot(list()[0]==list())
+stopifnot(NULL==list())
+l <- list()
+l[0]=12
+l
+"==============="
+l1 <- NULL
+l1[1] <- 12
+stopifnot(c(NULL, 12) == l1)
+typeof(l1)
+```
+
+
+```{r array abind::abind()}
+" a cubical array consists of 4 rectangular numbers (each consists of 2 rows and 3 columns) stacked on each other"
+a <- array(1:24, c(2,3,4))
+a
+"Rows , columns , heights"
+dim(a) 
+" a cubical array with hight 1 appended to bottem of cubical array above"
+abind::abind(a, array(-6:-1, c(2,3,1)))
+
+
+```
+
+
+```{r factors (special case of atomic vector of Integers) are S3 objects because of class attribute set to 'factors'}
+print("--- factor ---")
+
+f <- factor(c("a", "b", "c"))
+
+typeof(f)
+str(attributes(f))
+class(f)
+levels(f)
+print(f)
+contrasts(f)
+table(f)
+
+print("Type of table")
+typeof(table(f))
+str(attributes(table(f)))
+
+print("--------- Sex Factor--------")
+sex <- c("m", "m", "m", "m")
+sex_factor <- factor(sex, levels = c("m", "f"))
+str(attributes(sex_factor))
+contrasts(sex_factor)
+table(sex_factor)
+
+print(" ---- change the levels of factor ------")
+
+f1 <- factor(letters)
+str(attributes(f1))
+print("table")
+table(f1)
+print("contrasts")
+contrasts(f1)
+levels(f1) <- rev(levels(f1))
+str(attributes(f1))
+print("table")
+table(f1)
+print("contrasts")
+contrasts(f1)
+
+print(" ---- reversing factor vs reversing levels  ------")
+f1 <- rev(factor(letters))
+print("table")
+table(f1)
+print("contrasts")
+contrasts(f1)
+
+f2 <- factor(letters, levels = rev(letters))
+print("table")
+table(f2)
+print("contrasts")
+contrasts(f2)
+
+
+```
+
+
+```{r create a dataframe and a column being a factor}
+print("-------- ----------")
+# create a dataframe and a column being a factor
+# create a 3 level factor each repeating 4 times
+factor3X4 <- gl(3,4, labels=letters[1:3])
+str(attributes(factor3X4))
+typeof(factor3X4)
+contrasts(factor3X4)
+table(factor3X4)
+print(" set names for the factors")
+factor3X4WithNames <- setNames(factor3X4, paste0("o", seq_along(b0)))
+factor3X4WithNames
+df  <- data.frame(a = 1, B = factor3X4, f = gl(4,3))
+df # 12 X 3
+df. <- data.frame(a = 1, B = factor3X4WithNames, f = gl(4,3))
+df. # 12 X 3
+new <- data.frame(a = 8, B ="B", f = "1")
+new # 1 X 3
+(df1  <- rbind(df , new))
+(df.1 <- rbind(df., new))
+
+stopifnot(identical(df1, rbind(df,  new, make.row.names=FALSE)),
+          identical(df1, rbind(df., new, make.row.names=FALSE)))
+
+```
+
+```{r Date is another S3 object}
+today <- Sys.Date()
+typeof(today)
+class(today)
+attributes(today)
+
+print("---  Date S3 object ---")
+
+date1 <- as.Date("1986-02-11")
+date1
+unclass(date1)
+
+print(" use lubridate ")
+df <- data.frame(Date = c("10/9/2009 11:12:36", "10/15/2009T14:02:00"))
+dateTime <- lubridate::mdy_hms(df$Date)
+str(attributes(dateTime[1]))
+dateTime
+date <- lubridate::ymd("2019/11/24")
+str(attributes(date))
+date
+
+```
+```{r contingency table of its input variables}
+str(mtcars)
+x <- table(mtcars[c("vs","cyl", "am")])
+x
+
+```
+
+```{r Durations time between pairs of dates and dateTimes}
+one_week = as.difftime(1, units = "weeks")
+typeof(one_week)
+str(attributes(one_week))
+
+sevenDays = as.difftime(7, units="days")
+as.difftime("12 h", "%H")
+as.difftime("12 m", "%M")
+as.difftime("12 s", "%S")
+
+```
+```{r list is a collection of pointers, each to an object}
+l1 <- list(1:3, "a", c(TRUE, FALSE, TRUE), "Just a String", list(1,2,3,4))
+str(l1)
+typeof(l1)
+
+print("lists are recursive")
+l3 <- list(list(list(3)))
+"------- l3 --------"
+str(l3)
+"------- l3[[1]] --------"
+str(l3[[1]])
+"------- l3[[1]][[1]] --------"
+str(l3[[1]][[1]])
+"------- l3[[1]][[1]][[1]] --------"
+str(l3[[1]][[1]][[1]])
+
+" c combines mulitple list into one: "
+z <- c(list(1:3), "a", c("b","c"))
+str(z)
+is.list(z)
+l5 <- c(list(1,2,3), c(4,5))
+str(l5)
+is.list(l5)
+
+"list vs as.list"
+list(1:3)
+as.list(1:3)
+
+"A mixed matrix using list"
+l <- list(1:3, "a", T, 0, "b", "c", 0.12, 0.13, -1)
+dim(l) <- c(3,3)
+l
+```
+```{r tibble}
+library(tibble)
+df <- tibble(x=1:3, y=letters[1:3])
+typeof(df)
+attributes(df)
+str(df)
+
+"Backtic column name"
+names(tibble(`1`=1))
+
+sprintf("In tibbles Only values of length one is recycled")
+df1 <- tibble(x=1:6, y=1)
+df1
+
+sprintf("In dataframe Only vectors of length divideble by longer vector length is recycled")
+df2 <- data.frame(x=1:6, y=1:2)
+df2
+
+df3 <- tibble(x=1:9, y=x+2)
+df3
+
+sprintf(" Rownames are not a good idea because any duplication of rows creates new row names")
+df4 <- data.frame(x=(1:3), y=c(4), row.names = c("row1","row2","row3"))
+df4[c(1,1,1), ]
+
+sprintf("data frames partial match is source of bugs , so tibble does not have that:")
+
+df5 <- data.frame(xyz="a")
+df6 <- tibble(xyz="a")
+
+df5$x
+df6$x
+
+sprintf("subsetting tibble always returns a tibble or Null")
+df7 <- tibble(x=1:3, y="a", z="b")
+df7[c("x", "z")]
+
+is.data.frame(df7)
+is_tibble(df7)
+
+
+```
+
+
+```{r dataframe with zero rows, columns and both}
+library(tidyverse)
+zero <- tibble()
+str(zero)
+
+# now add rows to it one by one
+df1 <-  rbind (zero, tibble(x = c(1), y=c("a")) )
+df2 <- rbind(df1, tibble(x = c(2,3,4), y=c("a", "b", "c")))
+df2
+
+sprintf("tibble with zero number of rows")
+nrow(df2[0,])
+ncol(df2[0,])
+
+sprintf("tibble with zero number of columns")
+nrow(df2[,0])
+ncol(df2[,0])
+
+as.matrix(df2)
+data.matrix(df2)
+```
+
+
+```{r list column in dataframe}
+library(tibble)
+df <- tibble(x = 1:3)
+df$y <- list("1:3", letters[1:5], letters[8:18])
+df$y[[3]]
+df
+
+# to add a list collumn I() function is not requiered for tibble
+df1 <- tibble(x=1:3, y=list(1:3, 1:5, 8:18))
+df1$y[[2]][[3]]
+df1
+
+```
+```{r you can place a matrix in a column of dataframe if number of rows in matrix is equal to number of rows in dataframe}
+library(tibble)
+
+
+df <- tibble(x=1:3, y = matrix(1:6,nrow = 3, ncol = 2))
+df$y
+str(df)
+
+# you can have  dataframe as a column of another dataframe if rows of both df are the same
+df1 <- tibble(x=1:5, y=tibble(xx = letters[1:5]))
+df1$y$xx
+str(df1)
+dcv 
+```
+
+
+
+
+```{r raw stuff}
+print("Some raw stuff")
+
+x <- "A test string"
+y <- charToRaw(x)
+is.vector(y) # TRUE
+rawToChar(y)
+is.raw(x)
+is.raw(y)
+stopifnot( charToRaw("\xa3") == as.raw(0xa3) )
+
+isASCII <-  function(txt) all(charToRaw(txt) <= as.raw(127))
+isASCII(x)  # true
+isASCII("\xa325.63") # false (in Latin-1, this is an amount in UK pounds)
+
+
+xx < as.raw(2)
+xx[1] <- as.raw(40)
+xx[2] <- charToRaw("A")
+typeof(xx)
+xx
+dput(xx)
+stopifnot(charToRaw("\xa3") == as.raw(0xa3))
+
+```
+```{r complex stuff}
+require(graphics)
+
+0i ^ (-3:3)
+
+matrix(1i^ (-6:5), nrow = 4) #- all columns are the same
+0 ^ 1i # a complex NaN
+
+## create a complex normal vector
+z <- complex(real = stats::rnorm(100), imaginary = stats::rnorm(100))
+## or also (less efficiently):
+z2 <- 1:2 + 1i*(8:9)
+
+## The Arg(.) is an angle:
+zz <- (rep(1:4, len = 9) + 1i*(9:1))/10
+zz.shift <- complex(modulus = Mod(zz), argument = Arg(zz) + pi)
+plot(zz, xlim = c(-1,1), ylim = c(-1,1), col = "red", asp = 1,
+     main = expression(paste("Rotation by "," ", pi == 180^o)))
+abline(h = 0, v = 0, col = "blue", lty = 3)
+points(zz.shift, col = "orange")
+
+showC <- function(z) noquote(sprintf("(R = %g, I = %g)", Re(z), Im(z)))
+
+## The exact result of this *depends* on the platform, compiler, math-library:
+(NpNA <- NaN + NA_complex_) ; str(NpNA) # *behaves* as 'cplx NA' ..
+stopifnot(is.na(NpNA), is.na(NA_complex_), is.na(Re(NA_complex_)), is.na(Im(NA_complex_)))
+showC(NpNA)# but not always is {shows  '(R = NaN, I = NA)' on some platforms}
+## and this is not TRUE everywhere:
+identical(NpNA, NA_complex_)
+showC(NA_complex_) # always == (R = NA, I = NA)
+
+```
+
