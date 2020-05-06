@@ -269,4 +269,360 @@ sprintf("Logistic Regression : precision: %s", mean(precisions))
 sprintf("Logistic Regression : specificity 1-FP/N: %s", mean(specificities))
 
 ```
+```{r Use Bootstrap to find variability of LDAs coefficient estimates }
+library(tidyverse)
+library(class)
+library(boot)
+
+
+weekly.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
+                      header=T, stringsAsFactors = T, na.strings = "?")
+weekly.df = tibble(weekly.df)
+
+
+# train <- (weekly.df$Year >= 1990 & weekly.df$Year <= 2008)
+# test.Y <- weekly.df[!train,]$Direction
+# test.X <- weekly.df[!train,]
+# train.Y <- weekly.df[train, ]$Direction
+# 
+# train.X <- weekly.df[train,]
+
+boot.fn <- function (df, index){
+  lda.fit <- MASS::lda(Direction ~ Lag2, data = df,family = binomial, subset = index)
+  lda.fit$scaling
+} 
+
+# First estimate the coefficients on the full set 
+boot.fn(weekly.df,1:nrow(weekly.df))
+
+# we can use the function to create bootstrap estimate for LDA coefficient
+# by randomly sampling from among the observations with replacement 
+set.seed(17)
+boot.fn(weekly.df, sample(nrow(weekly.df),nrow(weekly.df), replace=T))
+
+boot.fn(weekly.df, sample(nrow(weekly.df),nrow(weekly.df), replace=T))
+
+boot.fn(weekly.df, sample(nrow(weekly.df),nrow(weekly.df), replace=T))
+
+boot.fn(weekly.df, sample(nrow(weekly.df),nrow(weekly.df), replace=T))
+
+# next we plugin the function into 'boot()' to compute SE[] of 1000 bootstrap estimates for the LDA coefficient
+boot(data=weekly.df, statistic = boot.fn, R = 1000)
+```
+
+```{r exercise 5}
+
+library(tidyverse)
+library(class)
+library(boot)
+set.seed(1)
+
+default.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Default.csv", 
+                      header=T, stringsAsFactors = T, na.strings = "?")
+default.df = tibble(default.df)
+colnames(default.df)
+
+str(default.df)
+
+# a)
+
+glm.fit <- glm(default ~ balance + income, data = default.df, family = binomial)
+sprintf("summary of logistic regression: ")
+summary(glm.fit)
+
+# b) 
+# get a random sample 
+train <- sample(nrow(default.df), nrow(default.df)/2) 
+
+# let's create a function that get the full data and a subset of indices as training set
+# and return the miss classification error rate on the validation set
+classify <- function(df , train.indices){
+  
+  # train on random set
+  glm.fit <- glm(default ~ balance + income, data = default.df, family = binomial, subset=train.indices)
+  
+  # obtain the prediction of default in validation set
+  contrasts(default.df$default)
+  
+  # since contrasts(default.df$default) shows dummy variable 1 asigned to "Yes"
+  # since P(y=1|x) is actually glm.probs what we get is prosterior of probability of defauly = Yes
+  
+  glm.probs <- predict(glm.fit, default.df[-train.indices, ], type =  "response")
+  
+  # convert posterior probabilities into "Yes" and "No"
+  glm.pred <- ifelse(glm.probs > 0.5, "Yes", "No")
+  stopifnot(length(glm.pred) == length(default.df[-train.indices, ]$default))
+  
+  (confusion_matrix <- table(glm.pred, default.df[-train.indices, ]$default))
+  
+  # validation set missclassification error rate
+  mean(glm.pred != default.df[-train.indices, ]$default)
+
+}
+
+classify(default.df, train)
+# c) 
+
+train <- sample(nrow(default.df), nrow(default.df)/3) 
+classify(default.df, train)
+
+train <- sample(nrow(default.df), 2*nrow(default.df)/3) 
+classify(default.df, train)
+
+train <- sample(nrow(default.df), 4*nrow(default.df)/5) 
+classify(default.df, train)
+
+train <- sample(nrow(default.df), nrow(default.df)/5) 
+classify(default.df, train)
+
+# in general all error rates are around 0.025
+
+# d) 
+classify1 <- function(df , train.indices){
+  
+  # train on random set
+  glm.fit <- glm(default ~ balance + income + student, 
+                 data = default.df, family = binomial, subset=train.indices)
+  
+  # obtain the prediction of default in validation set
+  contrasts(default.df$default)
+  
+  # since contrasts(default.df$default) shows dummy variable 1 asigned to "Yes"
+  # since P(y=1|x) is actually glm.probs what we get is prosterior of probability of defauly = Yes
+  
+  glm.probs <- predict(glm.fit, default.df[-train.indices, ], type =  "response")
+  
+  # convert posterior probabilities into "Yes" and "No"
+  glm.pred <- ifelse(glm.probs > 0.5, "Yes", "No")
+  stopifnot(length(glm.pred) == length(default.df[-train.indices, ]$default))
+  
+  (confusion_matrix <- table(glm.pred, default.df[-train.indices, ]$default))
+  
+  # validation set missclassification error rate
+  mean(glm.pred != default.df[-train.indices, ]$default)
+
+}
+
+train <- sample(nrow(default.df), nrow(default.df)/2) 
+classify(default.df, train)
+# adding student actually increased the error rate
+```
+```{r exercise 6}
+
+library(tidyverse)
+library(class)
+library(boot)
+set.seed(1)
+
+default.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Default.csv", 
+                      header=T, stringsAsFactors = T, na.strings = "?")
+default.df = tibble(default.df)
+colnames(default.df)
+
+glm.fit <- glm(default ~ balance + income ,data = default.df, family = binomial)
+
+# a)
+summary(glm.fit)
+
+# b)
+boot.fn <- function(df, index) {
+  glm.fit <- glm(default ~ balance + income ,data = default.df, family = binomial, subset = index)
+  coefficients(glm.fit)
+}
+
+# c)
+# next we plugin the boot.fn function into 'boot()' to compute SE[] of 1000
+# bootstrap estimates for the logistic regression coefficients
+(result <- boot(data=weekly.df, statistic = boot.fn, R = 100))
+
+print("--------------- Here are the values by capturing output:-------------------- ")
+library(stringr)
+
+(x <- capture.output(result)) # store the output as text
+(x <- str_extract(x ,"^t1.*$")) # grab the line that starts with t1
+(x <- x[!is.na(x)]) # remove all the lines we don't need
+
+# (se <- as.numeric(unlist(str_extract_all(x, '[0-9.]+$')))) # extract the final value (se)
+
+
+# d) 
+
+# For balance SE is shrink from 0.005647 to 0.000709 
+# For income  SE is changed from 2.081e-05 to 1.443805e-05 not much change
+
+```
+
+
+
+```{r Exercise 7}
+library(tidyverse)
+library(class)
+weekly.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
+                      header=T, stringsAsFactors = T, na.strings = "?")
+weekly.df = tibble(weekly.df)
+
+
+# a) Logistic regression using full data set:
+glm.fit1 <- glm(Direction ~ Lag1 + Lag2, data = weekly.df, family = binomial)
+
+# b) Logistic regression using full data set but the first observation:
+
+glm.fit2 <- glm(Direction ~ Lag1 + Lag2, data = weekly.df, family = binomial, subset=(1:nrow(weekly.df))[-1])
+
+# c) Predict first observation using model b 
+
+# first lets see the contrasts of Direction to know what is assigned to 1 and which is 2
+contrasts(weekly.df$Direction)
+
+# Contrasts shows Down is 0 and Up is 1
+# Since Posterior is P(Y=1|X) Tuse if posterior > 0.5 it should be "Up"
+
+glm.probs <- predict(glm.fit, weekly.df[1,], type =  "response")
+(glm.predict <- ifelse(glm.probs > 0.5 , "Up", "Down"))
+weekly.df[1,]$Direction
+
+# d)
+# First observation is not correctly classified
+# errors
+errorList = NULL
+
+for(i in 1:nrow(weekly.df)){
+  glm.fit <- glm(Direction ~ Lag1 + Lag2, data = weekly.df, family = binomial, subset = (1:nrow(weekly.df))[-i])
+  # Predict ith observation using model that is trained on all records but the ith one
+  glm.probs <- predict(glm.fit, weekly.df[i,], type =  "response")
+  (glm.predict <- ifelse(glm.probs > 0.5 , "Up", "Down"))
+  
+  # accumulate errors
+  errorList <-c(errorList , glm.predict != weekly.df[i,]$Direction)
+}
+
+# e)
+sprintf("average LOOC error rate: %s", mean(errorList) )
+
+
+```
+```{r Exercise 8: cross validation on a simulated data set}
+library(tidyverse)
+library(class)
+library(boot)
+
+# a ) generate simulated data set:
+set.seed(1)
+y = rnorm(100)
+x = rnorm(100)
+y = x - 2*x^2+rnorm(100)
+
+df <- tibble(y = y, x = x)
+head(df)
+
+# b)
+df %>%
+  ggplot(mapping = aes(x=x, y=y))+
+  geom_point(alpha=1/3)
+
+# c)
+set.seed(1)
+errors <- NULL
+for (i in 1:4){ 
+  glm.fit <- glm(y ~ poly(x, i), data=df)
+  errors <- rbind(errors, cv.glm(df, glm.fit)$delta)  
+}
+errors
+
+# d) repeat c with another random seed
+set.seed(17)
+errors <- NULL
+for (i in 1:4){ 
+  glm.fit <- glm(y ~ poly(x, i), data=df)
+  summary(glm.fit)
+  errors <- rbind(errors, cv.glm(df, glm.fit)$delta)  
+}
+errors
+
+# The result is the same for different seed vlues becuse there is no random 
+# componenet in LOOC procedure
+
+# f)
+
+for (i in 1:4){ 
+  glm.fit <- glm(y ~ poly(x, i), data=df)
+  print("---------- Ploy Model of oder -------------- ")
+  print(i)
+  
+  print(summary(glm.fit))
+}
+
+# Clearly in all the models only beta 1 and beta 2 are statistically signifocant which matches 
+# The result from LOOCV that shows ploynomial of order 2 has smallest error
+
+```
+
+```{r Exercise 8}
+library(tidyverse)
+library(class)
+library(boot)
+boston.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Boston.csv", 
+                      header=T, stringsAsFactors = T, na.strings = "?")
+boston.df = tibble(boston.df)
+str(boston.df)
+
+# a) 
+(muHat <- mean (boston.df$medv))
+
+# b)
+(SE_of_muHat <- sd(boston.df$medv) / sqrt(nrow(boston.df)))
+
+#c)
+boot.fn <- function(df, index) mean (df[index, ]$medv)
+
+(result <- boot(data=boston.df, statistic = boot.fn, R = 1000))
+
+# comparing with part b) , bootstrap error is a bit larger
+
+# d) 
+# lets calculate 95% confedence interval for the muHat estimator:
+# [muHat - 2*SE[muHat], muHat + 2*SE[muHat]]
+(leftBound <- 22.53281 - 2 * 0.4251931)
+(rightBound <- 22.53281 + 2 * 0.4251931)
+
+# e) provide an estimate for median value of the population based on the data set
+(muHatMed <- median(boston.df$medv))
+
+# f) calculate SE of muhatMed using bootstrap
+
+boot.fn <- function(df, index) median(df[index, ]$medv)
+(result <- boot(data=boston.df, statistic = boot.fn, R = 1000))
+
+# g) 10th percentile
+percentiles <- quantile(boston.df$medv,  probs = c(10, 25, 50, 75, 100)/100)
+print("-------- 10th percentile mdev: ------------- ")
+(muHat01 <- percentiles[1])
+
+# h) use bootstrap to find SE error for t0th percentile
+boot.fn <- function(df, index) quantile(df[index,]$medv,  probs = c(10, 25, 50, 75, 100)/100)[1]
+print("-------- bootstrap 10th percentile mdev: ------------- ")
+(result <- boot(data=boston.df, statistic = boot.fn, R = 10000))
+```
+
+```{r Quantile}
+set.seed(10)
+x <- rnorm(10000)
+
+tibble(x1 = quantile(x,  probs = seq(0,1,0.01), type=1), y = seq(0,1,0.01)) %>%
+  ggplot(mapping = aes(x=x1, y=y))+
+  geom_point(alpha=1/2)
+
+quantile(x) # Extremes & Quartiles by default
+quantile(x,  probs = c(0, 0.1, 0.5, 1, 2, 5, 10, 25, 50, 75, 100)/100)
+
+### Compare different types
+quantAll <- function(x, prob, ...)
+  t(vapply(1:9, function(typ) quantile(x, prob=prob, type = typ, ...), quantile(x, prob, type=1)))
+p <- c(0.1, 0.5, 1, 2, 5, 10, 50)/100
+signif(quantAll(x, p), 4)
+## for complex numbers:
+z <- complex(re=x, im = -10*x)
+signif(quantAll(z, p), 4)
+
+```
 
