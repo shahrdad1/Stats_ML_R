@@ -1,6 +1,8 @@
 ---
-title: "ISL-Ch5 Exercises"
-output: html_notebook
+title: "ISL Ch5 Exercises"
+output:
+  pdf_document: default
+  html_notebook: default
 ---
 
 ```{r sample()}
