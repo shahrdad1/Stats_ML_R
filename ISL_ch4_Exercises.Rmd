@@ -1,6 +1,8 @@
 ---
 title: "ISL-ch4 Lab and Exrecises.Rmd"
-output: html_notebook
+output:
+  pdf_document: default
+  html_notebook: default
 ---
 
 ```{r Lab 4.6.2 Logistic regression}

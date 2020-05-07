@@ -1,0 +1,12 @@
+---
+title: "ISLR CH6 Exercises"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+```{r}
+plot(cars)
+```
+

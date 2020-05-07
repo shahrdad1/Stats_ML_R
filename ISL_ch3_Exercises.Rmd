@@ -1,11 +1,14 @@
 ---
 title: "ISLR CH3 Applied Exercises"
-output: html_notebook
+output:
+  pdf_document: default
+  html_notebook: default
 ---
 
 
-```{r ISLR CH3, applied exercise# 8}
-auto.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Auto.csv", header=T, stringsAsFactors = F, na.strings = "?")
+```{r ISLR CH3 applied exercise 8}
+auto.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Auto.csv", 
+                   header=T, stringsAsFactors = F, na.strings = "?")
 
 str(auto.df)
 
@@ -31,7 +34,8 @@ fstatistic[[1]]
 fstatisticValue <- fstatistic[["value"]]
 fstatisticNumDegreesOfFreedom <- fstatistic[["numdf"]]
 fstatisticDenDegreesOfFreedom <- fstatistic[["dendf"]]
-overallPValue = pf(fstatisticValue, fstatisticNumDegreesOfFreedom, fstatisticDenDegreesOfFreedom,lower.tail = FALSE)
+overallPValue = pf(fstatisticValue, fstatisticNumDegreesOfFreedom, 
+                   fstatisticDenDegreesOfFreedom,lower.tail = FALSE)
 
 "-------- Type differences --------------"
 typeof(summary.lm[["r.squared"]]) # a double 
@@ -49,27 +53,34 @@ sprintf("RSE (Standard deviation from population regression line) = %f", rse)
 typeof(summary.lm$sigma) # double
 typeof(summary.lm ["sigma"]) # list
 percentageError = summary.lm$sigma/mean(auto.df$mpg)
-sprintf(" i) Yes: F-statistics %.4f > 1 and overall p-values %.4f < 0.05", fstatisticValue, overallPValue)
-sprintf(" ii) Deviation from population regression line is: %.4f%% and variablity explained by horsepower: %.f%%", floor(percentageError*100), floor(rsquared*100))
+sprintf(" i) Yes: F-statistics %.4f > 1 and overall p-values %.4f < 0.05", 
+        fstatisticValue, overallPValue)
+sprintf(" ii) Deviation from population regression line is: %.4f%% 
+        and variablity explained by horsepower: %.f%%", 
+        floor(percentageError*100), floor(rsquared*100))
 sprintf(" iii) Reltionship is negative:")
 coefficients
 
 sprintf("Confedence interval for coefficients: ")
 confint(summary.lm)
 
-sprintf(" iv) Predict mpg associated with a horsepower of 98 and show predicted value, confidence interval")
+sprintf(" iv) Predict mpg associated with a horsepower of 98 and 
+        show predicted value, confidence interval")
 predict(auto.lm, data.frame(horsepower = c(98)) , interval = "confidence")
-sprintf(" Predict mpg associated with a horsepower of 98 and show predicted value, prediction interval")
+sprintf(" Predict mpg associated with a horsepower of 98 and show predicted 
+        value, prediction interval")
 predict(auto.lm, data.frame(horsepower = c(98)) , interval = "prediction")
 
 sprintf("b) plot response and predictor:")
-plot(auto.df$mpg ~ auto.df$horsepower, col="red",xlab="horsepower",ylab="mpg") + abline(auto.lm, lwd=3, col="blue")
+plot(auto.df$mpg ~ auto.df$horsepower, col="red",xlab="horsepower",ylab="mpg") + 
+  abline(auto.lm, lwd=3, col="blue")
 
 sprintf("c) create diagnostic plots: ")
 par(mfrow=c(2,2))
 plot(auto.lm)
 par(mfrow=c(1,1))
-sprintf("Problems with the fit are : 1_ dependency is not linear, 2_ heteroscedastisity, 3_ high leverage, 4_ high leverage outlier")
+sprintf("Problems with the fit are : 1_ dependency is not linear, 
+        2_ heteroscedastisity, 3_ high leverage, 4_ high leverage outlier")
 
 # find which observation in dataframe has rstudent > 3
 sprintf (" rows in dataframe with rstudent >= 3:")
@@ -78,20 +89,29 @@ which(rstudent(auto.lm)>=3)
 #plot high leverage points (hatmatrix)
 n <- nrow(auto.df)
 p <- ncol(auto.df)
-plot(hatvalues(auto.lm), col=ifelse(hatvalues(auto.lm) > (p+1)/n, "red", "blue") ) +
-  text(hatvalues(auto.lm), labels=ifelse(hatvalues(auto.lm) > (p+1)/n, names(which(hatvalues(auto.lm) > (p+1)/n)), ""))
+plot(hatvalues(auto.lm), col=ifelse(hatvalues(auto.lm) > (p+1)/n, 
+                                    "red", "blue") ) +
+  text(hatvalues(auto.lm), 
+       labels=ifelse(hatvalues(auto.lm) > (p+1)/n, 
+                     names(which(hatvalues(auto.lm) > (p+1)/n)), ""))
 
 #plot outliers against student residual (rstudent)
-plot(predict(auto.lm), rstudent(auto.lm), col=ifelse(rstudent(auto.lm) >= 3, "red", "blue")) +
-  text(predict(auto.lm), rstudent(auto.lm), labels = ifelse(rstudent(auto.lm) >= 3, which(rstudent(auto.lm) >= 3), ""))
+plot(predict(auto.lm), rstudent(auto.lm), 
+     col=ifelse(rstudent(auto.lm) >= 3, "red", "blue")) +
+  text(predict(auto.lm), rstudent(auto.lm), 
+       labels = ifelse(rstudent(auto.lm) >= 3,
+                       which(rstudent(auto.lm) >= 3), ""))
 
 #plot hatvalues against outliers
-plot(hatvalues(auto.lm), rstudent(auto.lm), col=ifelse( hatvalues(auto.lm) > (p+1)/n || rstudent(auto.lm) >= 3, "red", "blue") )
+plot(hatvalues(auto.lm), rstudent(auto.lm), 
+     col=ifelse( hatvalues(auto.lm) > (p+1)/n || rstudent(auto.lm) >= 3, 
+                 "red", "blue") )
 
 ```
 
-```{r ISLR CH3, applied exercise# 9}
-auto.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Auto.csv", header=T,  na.strings = "?")
+```{r ISLR CH3 applied exercise 9}
+auto.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Auto.csv",
+                   header=T,  na.strings = "?")
 
 sprintf("a) scatter plot matrix")
 my_cols <- c("#00AFBB", "#E7B800", "#FC4E07")  
@@ -136,24 +156,31 @@ overallPValue = pf(fstatisticValue, fstatisticNumDegreesOfFreedom,
                    fstatisticDenDegreesOfFreedom,lower.tail = FALSE)
 
 
-sprintf("i) Yes because: F-statistics %.4f,  p-value: %.4f < 2.2e-16: ", fstatisticValue, overallPValue)
+sprintf("i) Yes because: F-statistics %.4f,  p-value: %.4f < 2.2e-16: ", 
+        fstatisticValue, overallPValue)
 sprintf("ii) displacement, weight, year, origin")
 sprintf("iii) miles per galon increases as year goes by")
 
 # diagnostic plots for linear regression fit:
 plot(df.lm)
 sprintf("d) nonlinearity and heteroschedasticity")
-sprintf(" High leverage points are rows 327 and 394 because there are above cook's line")
-sprintf(" Also 323 and 327 are the outliers, thus 327 is high levrage and outlier")
+sprintf(" High leverage points are rows 327 and 394
+        because there are above cook's line")
+sprintf(" Also 323 and 327 are the outliers, thus 327 
+        is high levrage and outlier")
 # plot high leverage points
 n <- nrow(dfSubsetWithNoNa)
 p <- ncol(dfSubsetWithNoNa)
 plot(hatvalues(df.lm), col=ifelse(hatvalues(df.lm) > (p+1)/n, "red", "blue"))+
-  text(hatvalues(df.lm), labels=ifelse(hatvalues(df.lm) > (p+1)/n, names(which(hatvalues(df.lm) > (p+1)/n)), ""))
+  text(hatvalues(df.lm), labels=ifelse(hatvalues(df.lm) > (p+1)/n, 
+                                       names(which(hatvalues(df.lm) > (p+1)/n)),
+                                       ""))
      
 # plot outliers
-plot(rstudent(df.lm), predict(df.lm), col=ifelse(rstudent(df.lm)>3, "red", "blue"))+
-  text(rstudent(df.lm), predict(df.lm), labels = ifelse(rstudent(df.lm)>3, names(which(rstudent(df.lm)>3)), ""))
+plot(rstudent(df.lm), predict(df.lm), col=ifelse(rstudent(df.lm)>3,
+                                                 "red", "blue"))+
+  text(rstudent(df.lm), predict(df.lm), 
+       labels = ifelse(rstudent(df.lm)>3,names(which(rstudent(df.lm)>3)), ""))
 
 sprintf("e) find all possible interactions first")
 
@@ -173,15 +200,18 @@ coeffs
 sprintf("f) try different transformation on statistically significant variables")
 
 "Fit a model with only those statistically significant variables"
-df.lm3 <- lm (mpg ~ displacement + acceleration + origin + displacement:year + acceleration:year + acceleration:origin, data = dfSubsetWithNoNa)
+df.lm3 <- lm (mpg ~ displacement + acceleration + origin + displacement:year +
+                acceleration:year + acceleration:origin, data = dfSubsetWithNoNa)
 summary(df.lm3)
 # plot diagnostic graphs
 plot(df.lm3)
 
-# first regress mpg over displacement and plot fitted vs residual to see if there is any bend shape
+# first regress mpg over displacement and plot fitted vs residual to
+# see if there is any bend shape
 mpg_displacement.lm <- lm(mpg ~ displacement, data = dfSubsetWithNoNa)
 plot(mpg_displacement.lm)
-# clearly we can see a curve shape and heteroscedasticity, thus let's use displacement^2 to see any improvement
+# clearly we can see a curve shape and heteroscedasticity, thus let's use 
+# displacement^2 to see any improvement
 
 mpg_displacementSquared.lm <- lm(mpg ~ I(displacement^2), data = dfSubsetWithNoNa)
 mpg_displacementSqrt.lm <- lm(mpg ~ I(displacement^0.5), data = dfSubsetWithNoNa)
@@ -198,27 +228,37 @@ new_mpg_for_squared <- predict(mpg_displacementSquared.lm, newDisplacementDf)
 new_mpg_for_sqrt <- predict(mpg_displacementSqrt.lm, newDisplacementDf)
 new_mpg_for_log <- predict(mpg_displacementLog.lm, newDisplacementDf)
 
-plot( dfSubsetWithNoNa[["displacement"]], dfSubsetWithNoNa[["mpg"]], xlab = "displacement", ylab="mpg", main = "displacement against mpg with new prediction")+
+plot( dfSubsetWithNoNa[["displacement"]], dfSubsetWithNoNa[["mpg"]], 
+      xlab = "displacement", ylab="mpg", 
+      main = "displacement against mpg with new prediction")+
   lines(displacementvalues, new_mpg_for_squared, col="red") + 
   lines(displacementvalues, new_mpg_for_sqrt, col="blue",lty=2) + 
   lines(displacementvalues, new_mpg_for_log, col="green",lty=3)
   
 # change displacement -> displacement^2 improve f statistics and Rsquered
-df.lm4 <- lm (mpg ~ I(displacement^2) + acceleration + origin + displacement:year + acceleration:year + acceleration:origin, data = dfSubsetWithNoNa)
+df.lm4 <- lm (mpg ~ I(displacement^2) + acceleration + origin + 
+                displacement:year + acceleration:year + acceleration:origin, 
+              data = dfSubsetWithNoNa)
 summary(df.lm4)
 
 
-#change acceleration -> log(acceleration) reduce Rsquared and increase RSE thus it does not help
-df.lm5 <- lm (mpg ~ I(displacement^2) + log1p(acceleration) + origin + displacement:year + acceleration:year + acceleration:origin, data = dfSubsetWithNoNa)
+#change acceleration -> log(acceleration) reduce Rsquared and 
+# increase RSE thus it does not help
+df.lm5 <- lm (mpg ~ I(displacement^2) + log1p(acceleration) + origin + 
+                displacement:year + acceleration:year + acceleration:origin, 
+              data = dfSubsetWithNoNa)
 summary(df.lm5)
 
 # change origin -> log(origin) does not change the result 
-df.lm6 <- lm (mpg ~ I(displacement^2) + acceleration + log1p(origin) + displacement:year + acceleration:year + acceleration:origin, data = dfSubsetWithNoNa)
+df.lm6 <- lm (mpg ~ I(displacement^2) + acceleration + log1p(origin) + 
+                displacement:year + acceleration:year + acceleration:origin, 
+              data = dfSubsetWithNoNa)
 ```
 
 
-```{r ISLR CH3, applied exercise# 10}
-carseats.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Carseats.csv", header=T,  na.strings = "?", stringsAsFactors = F)
+```{r ISLR CH3 applied exercise 10}
+carseats.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Carseats.csv", 
+                       header=T,  na.strings = "?", stringsAsFactors = F)
 
 # summary(carseats.df)
 
@@ -232,16 +272,18 @@ sprintf(" Number of observations containing NA is %d ",nrow(carseats.dfWithNa))
 
 # now that there is no Na, we can safely convert US and Urban columns into factor
 
-carseats.df[["ShelveLoc_factor"]] <- factor(carseats.df[["ShelveLoc"]], 
-                                            levels = c("Good", "Medium", "Bad"))
-carseats.df[["Urban_factor"]] <- factor(carseats.df[["Urban"]], levels = c("Yes", "No"))
-carseats.df[["US_factor"]] <- factor(carseats.df[["US"]], levels = c("Yes", "No"))
+carseats.df[["ShelveLoc_factor"]] <-
+  factor(carseats.df[["ShelveLoc"]], levels = c("Good", "Medium", "Bad"))
+carseats.df[["Urban_factor"]] <- factor(carseats.df[["Urban"]], 
+                                        levels = c("Yes", "No"))
+carseats.df[["US_factor"]] <- factor(carseats.df[["US"]], 
+                                     levels = c("Yes", "No"))
 
-sprintf(" -------------- contrats carseats.df[['ShelveLoc_factor']] -------------------")
+sprintf(" -------------- contrats carseats.df[['ShelveLoc_factor']] ----------")
 contrasts(carseats.df[["ShelveLoc_factor"]])
 table(carseats.df[["ShelveLoc_factor"]])
 
-sprintf(" -------------- contrats carseats.df[['Urban_factor']] -------------------")
+sprintf(" -------------- contrats carseats.df[['Urban_factor']] --------------")
 contrasts(carseats.df[["Urban_factor"]])
 table(carseats.df[["Urban_factor"]])
 
@@ -254,18 +296,22 @@ carseats.lm <- lm(Sales ~ Price + Urban_factor + US_factor, data = carseats.df)
 summary(carseats.lm)
 sprintf("base is urbon = No and also Us = No" )
 sprintf(" In urbon area sales increases by 2%% ")
-sprintf(" outside US sales decreases by 12%% or equivalently in US increases by 12%%")
+sprintf(" outside US sales decreases by 12%% or 
+        equivalently in US increases by 12%%")
 
-sprintf(" model that only uses the predictors for which there is evidence of association")
+sprintf(" model that only uses the predictors for which 
+        there is evidence of association")
 
 carseats.lm.smaller <- lm(Sales ~ Price + US_factor, data = carseats.df)
 summary1 <- summary(carseats.lm.smaller)
-sprintf("F-statisitcs improved , RSE slightly improved but Rsquared did not improve that much")
+sprintf("F-statisitcs improved , RSE slightly improved but 
+        Rsquared did not improve that much")
 
 coeffsMatrix <- coef(summary1)
 coeffsMatrix
 originalConfInt <- confint(carseats.lm.smaller)
-myConfInt <- cbind(coeffsMatrix[,1]-coeffsMatrix[,2]*2, coeffsMatrix[,1]+coeffsMatrix[,2]*2)
+myConfInt <- cbind(coeffsMatrix[,1]-coeffsMatrix[,2]*2, 
+                   coeffsMatrix[,1]+coeffsMatrix[,2]*2)
 originalConfInt
 myConfInt
 
@@ -289,7 +335,7 @@ sprintf("There is no high leverage point which is also outlier")
 ```
 
 
-```{r ISLR CH3, applied exercise# 13}
+```{r ISLR CH3 applied exercise 13}
 # if (!require("pacman")) install.packages("pacman") 
 # p_load(datasets, ggplot2, ggthemes, dplyr, RColorBrewer, grid)
 # data(airquality)
@@ -328,7 +374,8 @@ summary.lm2 <- summary(data.lm2)
 summary.lm2
 coef(summary.lm2)
 confint(data.lm2)
-sprintf("RSE significantly reduced and F2 increased when we decreased error also coefficients gets much closer to real values")
+sprintf("RSE significantly reduced and F2 increased when we 
+        decreased error also coefficients gets much closer to real values")
 
 plot(x, yy, col="black") + 
   abline(coef = c(-1, 0.5), col="red")+
@@ -349,7 +396,8 @@ summary.lm3 <- summary(data.lm3)
 summary.lm3
 coef(summary.lm3)
 confint(data.lm3)
-sprintf("RSE significantly increased and F2 decreased when we increased error also coefficients gets much closer to real values")
+sprintf("RSE significantly increased and F2 decreased when we 
+        increased error also coefficients gets much closer to real values")
 
 plot(x, yy2, col="black") + 
   abline(coef = c(-1, 0.5), col="red")+
@@ -365,7 +413,7 @@ sprintf("For less noisy data has smaller confedence interval than noisier data")
 ```
 
 
-```{r ISLR CH3, applied exercise# 14}
+```{r ISLR CH3 applied exercise 14}
 set.seed(1)
 x1 <- runif(100)
 x2 <- 0.5*x1 + rnorm(100)/10
@@ -387,7 +435,9 @@ sprintf("Fit a least square model y ~ x2: ")
 lm3 <- lm(yc ~ xc2, data = data.frame(xc2 = x2, yc = y))
 summary(lm3)
 
-sprintf("No contradiction: there is a correlation between x1 and x2, if one is there the other do not add much information (each one alone adds info)")
+sprintf("No contradiction: there is a correlation between x1 and x2, 
+        if one is there the other do not add much information 
+        (each one alone adds info)")
 # add new information to existsing data
 x1 <- c(x1, 0.1)
 x2 <- c(x2, 0.8)
@@ -414,13 +464,16 @@ plot(lm2)
 "new data (observation 101) is only high leverage in y1 ~ x2 model"
 plot(lm3)
 
-sprintf(" as before there is a correlation between x1 and x2, if one is there the other do not add much information (each one alone adds info)")
+sprintf(" as before there is a correlation between x1 and x2, 
+        if one is there the other do not add much information 
+        (each one alone adds info)")
 
 
 ```
 
-```{r ISLR CH3, applied exercise# 15}
-boston.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Boston.csv", header=T,  na.strings = "?", stringsAsFactors = T)
+```{r ISLR CH3 applied exercise 15}
+boston.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Boston.csv", 
+                     header=T,  na.strings = "?", stringsAsFactors = T)
 # summary(boston.df)
 str(boston.df)
 
@@ -476,9 +529,11 @@ sprintf("a ) There is no strong relationship between chas and crime")
 boston.lm <- lm(crim ~ ., data = boston.df)
 summary(boston.lm)
 
-sprintf("b_) For all predictors except: indus, chas, nox, rm, age, tax, ptratio, lstat we can reject null hypothesis")
+sprintf("b_) For all predictors except: indus, chas, nox, rm, age, 
+        tax, ptratio, lstat we can reject null hypothesis")
 
-xs <- c(coef(lm1)[2],coef(lm2)[2],coef(lm3)[2],coef(lm4)[2],coef(lm5)[2],coef(lm6)[2],coef(lm7)[2],coef(lm8)[2],
+xs <- c(coef(lm1)[2],coef(lm2)[2],coef(lm3)[2],coef(lm4)[2],coef(lm5)[2],
+        coef(lm6)[2],coef(lm7)[2],coef(lm8)[2],
   coef(lm9)[2],coef(lm10)[2],coef(lm11)[2],coef(lm12)[2],coef(lm13)[2])
 
 coefs <- coef(boston.lm)
@@ -519,7 +574,7 @@ summary(lm13)
 
 
 
-```{r rowSum, and row cherry picking from a dataframe}
+```{r rowSum and row cherry picking from a dataframe}
 x <- cbind(x1 = 3, x2 = c(4:1, 2:5))
 x
 rowSums(x); colSums(x)

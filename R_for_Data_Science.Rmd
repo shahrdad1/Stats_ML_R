@@ -1,6 +1,8 @@
 ---
 title: "R for Data science"
-output: html_notebook
+output:
+  pdf_document: default
+  html_notebook: default
 ---
 
 
@@ -497,8 +499,7 @@ not_cancelled %>%
 
 flights %>%
   group_by(year, month, day) %>%
-  summarize(cancelledFlights = sum(is.na(arr_delay) | (is.na(dep_delay))),
-            avgArrDelay = mean(is.na(arr_delay), na.rm = T)) %>%
+  summarize(cancelledFlights = sum(is.na(arr_delay) | (is.na(dep_delay))), avgArrDelay = mean(is.na(arr_delay), na.rm = T)) %>%
   arrange(desc(avgArrDelay)) %>%
   filter(cancelledFlights <= 75) %>%
   ggplot(mapping = aes(x=cancelledFlights, y = avgArrDelay)) +
@@ -577,7 +578,7 @@ poular_dests %>%
 
 
 ```
-```{r Exercises 5.7.1}
+```{r Exercises 571}
 # 1) 
 # Filter function is appalied to each group and shrinks the elements of each group 
 flights %>%
@@ -586,7 +587,7 @@ flights %>%
 
 # mutate function with group
 # Arithmetic operators with group_by
-flights %>%
+# flights %>%
   
  
 ```

@@ -1,5 +1,5 @@
 ---
-title: "ISL Ch5 Exercises"
+title: "ISL Ch5 Lab and Exercises"
 output:
   pdf_document: default
   html_notebook: default
@@ -459,8 +459,7 @@ library(stringr)
 ```{r Exercise 7}
 library(tidyverse)
 library(class)
-weekly.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
-                      header=T, stringsAsFactors = T, na.strings = "?")
+weekly.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", header=T, stringsAsFactors = T, na.strings = "?")
 weekly.df = tibble(weekly.df)
 
 
@@ -479,7 +478,7 @@ contrasts(weekly.df$Direction)
 # Contrasts shows Down is 0 and Up is 1
 # Since Posterior is P(Y=1|X) Tuse if posterior > 0.5 it should be "Up"
 
-glm.probs <- predict(glm.fit, weekly.df[1,], type =  "response")
+glm.probs <- predict(glm.fit2, weekly.df[1,], type =  "response")
 (glm.predict <- ifelse(glm.probs > 0.5 , "Up", "Down"))
 weekly.df[1,]$Direction
 
