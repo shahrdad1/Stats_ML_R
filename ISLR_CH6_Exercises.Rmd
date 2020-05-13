@@ -6,7 +6,294 @@ output:
 ---
 
 
-```{r}
-plot(cars)
+```{r Lab 651 Best subset selection}
+library(tidyverse)
+library(leaps)
+hitters.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Hitters.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+# note that Salary is od type string and some of them are NA
+sum(hitters.df$Salary=="NA")
+
+# first remove character NAs
+hitters.df <- hitters.df[hitters.df$Salary != "NA",]
+
+# now convert Salary into numeric
+hitters.df$Salary <- as.numeric(as.character(hitters.df$Salary))
+  
+# Now convert it to tibble
+hitters.df <- tibble(hitters.df)
+
+# regsubsets() part of lepas library chooses best subset using RSS
+
+
+regfit.full <- regsubsets(Salary ~ ., hitters.df, nvmax = 19) 
+
+#The summary shows the result of step 2 of algorithm 6.3 page 209 of the book 
+summary <- summary(regfit.full)
+
+names(summary)
+summary
+
+# coef(, n) returns coefficient estimates associated with best n variable model
+coef(regfit.full,4)
+
+# plot Rsq , Cp and BIC 
+# par(mfrow=c(1,1))
+plot(summary$rss, xlab = "Number of variables", ylab="RSS",type = "l")
+plot(summary$adjr2,xlab = "Number of variables", ylab="Adjuster Rsquared",
+     type = "l")
+
+# which.max() returns location maximum point of the vector
+(index <- which.max(summary$adjr2))
+points(index, summary$adjr2[index], col="red", cex=2, pch=20)
+
+# which.min() returns location minimum point of the vector
+plot(summary$cp, xlab =" Numbers of variables", ylab="Cp", type="l")
+(index <- which.min(summary$cp))
+points(index, summary$cp[index], col="red", cex=2, pch=20)
+
+# same for bic
+plot(summary$bic, xlab =" Numbers of variables", ylab="Bic", type="l")
+(index <- which.min(summary$cp))
+points(index, summary$bic[index], col="red", cex=2, pch=20)
+
+# regsubsets() has builtin plot() command that displays selected variables for 
+# best model with a given number of predictors
+
+plot(regfit.full,scale="r2")
+plot(regfit.full,scale="adjr2")
+plot(regfit.full,scale="Cp")
+plot(regfit.full,scale="bic")
+
+
 ```
+```{r Lab 652 Forward and backward stepwise selection}
+library(tidyverse)
+library(leaps)
+hitters.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Hitters.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+# note that Salary is od type string and some of them are NA
+sum(hitters.df$Salary=="NA")
+
+# first remove character NAs
+hitters.df <- hitters.df[hitters.df$Salary != "NA",]
+
+# now convert Salary into numeric
+hitters.df$Salary <- as.numeric(as.character(hitters.df$Salary))
+  
+# Now convert it to tibble
+hitters.df <- tibble(hitters.df)
+
+# we can use regsubsets() to perform forward / backward stepwise selection
+
+regfit.fwd <- regsubsets(Salary ~ ., data = hitters.df, nvmax=ncol(hitters.df), 
+                         method = "forward")
+
+summary(regfit.fwd)
+
+# coefficient for the best model with 3 coefficients
+(coefs <- coef(regfit.fwd,3))
+names(coefs)
+```
+```{r 653 use CV to choose one of set of models chosen in step 2 of the algorithms ) }
+library(tidyverse)
+library(leaps)
+hitters.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Hitters.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+# note that Salary is od type string and some of them are NA
+sum(hitters.df$Salary=="NA")
+
+# first remove character NAs
+hitters.df <- hitters.df[hitters.df$Salary != "NA",]
+
+# now convert Salary into numeric
+hitters.df$Salary <- as.numeric(as.character(hitters.df$Salary))
+  
+# Now convert it to tibble
+hitters.df <- tibble(hitters.df)
+# first we create a vector that allocates each observation to one of K = 10 folds
+k = 10
+set.seed(1)
+
+# create k folds
+folds <- sample(1:k, nrow(hitters.df), replace = T)
+# table(folds)
+#  1  2  3  4  5  6  7  8  9 10 
+# 35 25 33 31 34 31 32 29 39 33 
+
+# number of features
+noOfFeatures <- ncol(hitters.df) -1
+
+# an empty accumulator to store MSE for each fold and each predictor
+cv.errors <- matrix(NA, k, noOfFeatures, 
+                    dimnames = list(NULL, paste(1:noOfFeatures)))
+
+# Here is cv.errors:
+# ====================
+#       1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19
+#  [1,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+#  [2,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+#  [3,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+#  [4,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+#  [5,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+#  [6,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+#  [7,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+#  [8,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+#  [9,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+# [10,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
+
+# perform a cross validation on a for loop
+for (j in 1:k){
+  # step# 2 of algorithm is evaluated on all folds except one of them each time
+  # it chooses best models with number of features 1,2,..., noOfFeatures 
+  # on k-1 training folds
+  best.fit <- regsubsets(Salary ~ ., data = hitters.df[folds != j, ], 
+                         nvmax = noOfFeatures)
+
+  # Now build X matrix from test data
+  test.mat <- model.matrix(Salary ~ ., data = hitters.df[folds == j, ])
+    
+#model.matrix:
+# ------------    
+#(Intercept) AtBat Hits HmRun Runs RBI Walks Years CAtBat CHits CHmRun CRuns ...
+#         1   202   53     4   31  26    27     9   1876   467     15   192  ...
+#         1   239   60     0   30  11    22     6   1941   510      4   309  ...
+#         1   472  116    16   60  62    74     6   1924   489     67   242  ...
+  
+  # now compute CV test error for each of  models that have best number of 
+  # predictors on test fold # j 
+  for(i in 1:noOfFeatures){
+    # extract coefficients for model # i
+    coefi <- coef(best.fit, id = i)
+    
+    # claculate cv test error for each row in test matrix()
+    predicted_values <- test.mat [, names(coefi)] %*% coefi
+    cv.errors[j,i] <- mean((predicted_values - hitters.df[folds ==j, ]$Salary)^2)
+  }
+}
+
+# finally calculate mean of CV MSE error for each model
+cv.error.means <- rep(NA, ncol(cv.errors))
+for (l in 1:ncol(cv.errors)){
+  cv.error.means[l] <- mean(cv.errors[ ,l])
+}
+
+# find the minimum of all cv-MSE means and corresponding coefficients
+print("minimum of all cv-MSE means and corresponding coefficients: ")
+which.min(cv.error.means)
+
+# seems like model with following 10 predictors has least MSE error on test data
+names(coef(best.fit, id = which.min(cv.error.means)))
+
+```
+
+```{r example of backward feature selection for LDA }
+library(tidyverse)
+library(class)
+library(boot)
+
+set.seed(17)
+weekly.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+weekly.df = tibble(weekly.df)
+
+#-------- Some usual cleaning on character columns ---------------- #
+
+# First remove all recods with spaces in character column Direction
+weekly.df$Direction <- gsub('\\s+', '', weekly.df$Direction)
+
+# Second remove all leading and trailing spaces from a character column "Direction"
+weekly.df$Direction <- trimws(weekly.df$Direction, which = c("both"))
+
+# Remove all records with "NA" or empty string in character column "Direction"
+weekly.df <- weekly.df[!(tolower(weekly.df$Direction) == "na" | 
+                           weekly.df$Direction == ""), ]
+
+# convert all character fields 
+weekly.df[sapply(weekly.df, is.character)] <- 
+  lapply(weekly.df[sapply(weekly.df, is.character)], as.factor)
+
+#----------- Find and remove NA in all columns ------------- #
+weekly.df <- na.omit(weekly.df)
+
+# ---------- stepwise forward feature selectin with CV -----------#
+
+# create k-fold 
+k <- 10
+threshold <- 0.5
+
+set.seed(1)
+
+# create k folds
+folds <- sample(1:k, nrow(weekly.df), replace = T)
+
+# For folds with same size do:
+# sameSizefolds <- sample(rep(1:k, length.out = nrow(weekly.df)), 
+#                                        size = nrow(weekly.df), replace = F)
+# table(sameSizefolds)
+
+
+# number of features
+noOfFeatures <- ncol(weekly.df) -1
+
+# an empty accumulator to store MSE for each fold and each predictor
+cv.errors <- matrix(NA, k, noOfFeatures, 
+                    dimnames = list(NULL, paste(1:noOfFeatures)))
+
+
+# perform a cross validation on a for loop
+for (j in 1:k){
+  # step# 2 of algorithm 6.3 page 209 is evaluated on all folds except one of 
+  # them each time it chooses best models with number of features 
+  # 1,2,..., noOfFeatures on k-1 training folds.
+  best.fit <- regsubsets(Direction ~ ., data = weekly.df[folds != j, ], 
+                         nvmax = noOfFeatures, method = "backward")
+
+
+  # Compute CV test error for each of  models that have best number of 
+  # predictors on test fold # j 
+  for(i in 1:noOfFeatures){
+    
+    # extract coefficients for model # i
+    coefi <- coef(best.fit, id = i)
+
+    # For classification we are interested in name 
+    # of features for model # i (not their coefficients)
+    # except intercept
+    predictorsOfModel <- names(coefi)[-1]
+    # fit the model on k-1 trainimng portion
+    lda.fit <- MASS::lda(as.formula(paste("Direction~", paste(predictorsOfModel, collapse="+"))), 
+                   data = weekly.df, family = binomial, subset = (folds != j))
+
+    # predict on single validation fold
+    lda.pred <- predict(lda.fit, weekly.df[folds == j, ], type =  "response")
+    # since contrasts(weekly.df$Direction) shows dummy variable 1 asigned to 'Up'
+    # and since P(y=1|x) is glm.probs what we get is prosterior of probability of 'Up' case
+    stopifnot(length (lda.pred$class) == length(weekly.df[folds == j, ]$Direction))
+    cv.errors[j,i] <- mean(lda.pred$class == weekly.df[folds == j, ]$Direction)
+  }
+}
+
+# finally calculate mean of CV MSE error for each model
+cv.error.means <- rep(NA, ncol(cv.errors))
+for (i in 1:ncol(cv.errors)){
+  cv.error.means[i] <- mean(cv.errors[, i])
+}
+
+# find the minimum of all cv-MSE means and corresponding coefficients
+print("minimum of all cv-MSE means and corresponding coefficients: ")
+which.min(cv.error.means)
+
+# seems like model with following 5 predictors has least MSE error on test data
+names(coef(best.fit, id = which.min(cv.error.means) ))
+
+
+```
+
 

@@ -188,6 +188,7 @@ auc(roc_obj)
 
 
 ```
+
 ```{r Lab 4.6.4 QDA}
 
 library(tidyverse)
@@ -231,6 +232,7 @@ auc(roc_obj)
 # However, we recommend evaluating this method’s performance on a larger test set before betting that this approach will consistently beat the market!
 
 ```
+
 ```{r Lab 4.6.5 KNN}
 
 # knn() forms predictions using a single command
@@ -310,6 +312,7 @@ glm.pred <- ifelse(glm.probs > 0.05 , "Yes", "No")
 table(glm.pred, test.Y)
 
 ```
+
 ```{r Exercise 10}
 library(tidyverse)
 library(class)

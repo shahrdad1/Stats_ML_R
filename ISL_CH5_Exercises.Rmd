@@ -271,6 +271,8 @@ sprintf("Logistic Regression : precision: %s", mean(precisions))
 sprintf("Logistic Regression : specificity 1-FP/N: %s", mean(specificities))
 
 ```
+
+
 ```{r Use Bootstrap to find variability of LDAs coefficient estimates }
 library(tidyverse)
 library(class)
@@ -409,6 +411,7 @@ train <- sample(nrow(default.df), nrow(default.df)/2)
 classify(default.df, train)
 # adding student actually increased the error rate
 ```
+
 ```{r exercise 6}
 
 library(tidyverse)
