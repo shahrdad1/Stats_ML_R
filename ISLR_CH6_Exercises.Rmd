@@ -817,52 +817,66 @@ rates <- lapply(results, function (result) {
 
 # result shows 1 pca is the best , 2 or 3 number of PCAS areacceptable
 ```
-```{r}
+```{r 672 partial least square}
 library(tidyverse)
 library(pls)
 
-weekly.df = 
-  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
-                      header=T, stringsAsFactors = F, na.strings = "?")
+
+hitters.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Hitters.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
 # -------------- Usual clean up first ------------------#
 
-# First remove all recods with spaces in character column Direction
-weekly.df$Direction <- gsub('\\s+', '', weekly.df$Direction)
+# First remove all recods with spaces in character column Salary
+hitters.df$Salary <- gsub('\\s+', '', hitters.df$Salary)
 
-# Second remove all leading and trailing spaces from a character column "Direction"
-weekly.df$Direction <- trimws(weekly.df$Direction, which = c("both"))
+# Second remove all leading and trailing spaces from a character column "Salary"
+hitters.df$Salary <- trimws(hitters.df$Salary, which = c("both"))
 
-# Remove all records with "NA" or empty string in character column "Direction"
-weekly.df <- weekly.df[!(tolower(weekly.df$Direction) == "na" | 
-                           weekly.df$Direction == ""), ]
+# Remove all records with "NA" or empty string in character column "Salary"
+hitters.df <- hitters.df[!(tolower(hitters.df$Salary) == "na" | 
+                           hitters.df$Salary == ""), ]
 
-# convert all character fields to factor
-weekly.df[sapply(weekly.df, is.character)] <-
- lapply(weekly.df[sapply(weekly.df, is.character)], as.factor)
+# convert Salary column to numberic
+hitters.df$Salary <- as.numeric(as.character(hitters.df$Salary))
+
+# convert all character fields 
+hitters.df[sapply(hitters.df, is.character)] <- 
+  lapply(hitters.df[sapply(hitters.df, is.character)], as.factor)
 
 # Find and remove NA in all columns 
-weekly.df <- na.omit(weekly.df)
+hitters.df <- na.omit(hitters.df)
 
-#----------------------- calculate all PCA scores ------------------------
-# First create predictor matrix and response vector
-predictorX <- model.matrix(Direction~., weekly.df)[, -1]
-responseY <- weekly.df$Direction
+set.seed(2)
 
-# next use PCA to find principal components:
-(pca <- princomp(predictorX, cor=T)) # PCA using correlation matrix
+# fit the model using pls
+pls.fit <- plsr(Salary ~ ., data = hitters.df, scale = T, validation="CV")
 
-weekly.pca <- as_tibble(pca$scores[,]*-1) %>% 
-  add_column(Direction=responseY)
+print ("Summary:")
+summary(pcr.fit)
 
-(pca.cols <- colnames(weekly.pca[ , !(names(weekly.pca) %in% c("Direction"))]))
+validationplot(pls.fit, val.type = "MSEP")
 
-result <- NULL
+# Now to see how model with 7 works on test data an compare it with 
+# model with M = 17 we split data into test and train and fit the model
+# on train 
 
-for (pc.col.idx in 1:length(pca.cols)){
-  pca.chosen.cols <- pca.cols[1:pc.col.idx]
-  result <- bind_rows(result,c(no.of.pcas = pc.col.idx)) 
-}
-result
+set.seed(1)
+train <- train <- sample(1:nrow(hitters.df), nrow(hitters.df)/2)
+test <- (-train)
+pls.fit <- plsr(Salary ~ ., data=hitters.df, subset=train, scale=T, validation="CV")
+summary(pls.fit)
+validationplot(pls.fit, val.type = "MSEP")
+
+# now let's find the lowest cross validation error occurs M = 7 on the  model
+test.y <- hitters.df[test,]$Salary
+pls.pred <- predict(pcr.fit, hitters.df[test,], ncomp = 7)
+
+sprintf("lowest MSE corresponding to M = 7 is %s (Ridge was 143257.45)",mean((pls.pred-test.y)^2))
+# PLSR really does not add that much value to PCR
+mean((pls.pred-test.y)^2)
+
 ```
 
 ```{r createDataPartition bootstrap sample and other samples}
