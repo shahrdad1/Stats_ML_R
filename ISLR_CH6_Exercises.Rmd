@@ -295,5 +295,653 @@ names(coef(best.fit, id = which.min(cv.error.means) ))
 
 
 ```
+```{r Ridge regression }
+library(tidyverse)
+library(glmnet)
 
+hitters.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Hitters.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+# -------------- Usual clean up first ------------------#
+
+# First remove all recods with spaces in character column Salary
+hitters.df$Salary <- gsub('\\s+', '', hitters.df$Salary)
+
+# Second remove all leading and trailing spaces from a character column "Salary"
+hitters.df$Salary <- trimws(hitters.df$Salary, which = c("both"))
+
+# Remove all records with "NA" or empty string in character column "Salary"
+hitters.df <- hitters.df[!(tolower(hitters.df$Salary) == "na" | 
+                           hitters.df$Salary == ""), ]
+
+# convert Salary column to numberic
+hitters.df$Salary <- as.numeric(as.character(hitters.df$Salary))
+
+# convert all character fields 
+hitters.df[sapply(hitters.df, is.character)] <- 
+  lapply(hitters.df[sapply(hitters.df, is.character)], as.factor)
+
+# Find and remove NA in all columns 
+hitters.df <- na.omit(hitters.df)
+
+# Use glmnet () for Ridge (glmnet only take numarical values) 
+# glmnet automatically standardize predictors unless we set standardize = F
+
+# first create a matrix of all predictors
+# model.matrix automatically transforms any qualitative variable to factor
+
+x <- model.matrix(Salary~., hitters.df)[, -1]
+y <- hitters.df$Salary
+
+# apply Ridge
+grid <- 10 ^ seq(10, -2, length = 100)
+# alpha = 0 causes Ridge to be applied
+ridge.model <- glmnet(x, y, alpha=0, lambda = grid)
+
+# there are 100 values for λ and associated to each we have 
+# number of ncol(hitters.df) coefficients
+
+ridge.model$lambda[50]
+
+# get the coefficients corresponding to 50th λ:
+rownames(coef(ridge.model))
+coef(ridge.model)[,50]
+
+# foe some reason there are two intercept coefficients at the begining
+# we drop first one to calculate L2 norm of the coefficints
+sqrt(sum(coef(ridge.model)[-1,50]^2))
+
+# we use predict to get a new value for coefficients for any given value of λ
+predict(ridge.model, s = 51, type="coefficients")[1:20]
+
+# now split the samples into test and training:
+set.seed(10)
+train <- sample(1:nrow(x), nrow(x)/2)
+test <- (-train)
+y.test <- y[test]
+
+# Fit ridge regression model to trainig data
+ridge.model <- glmnet(x[train, ], y[train], alpha=0, 
+                      lambda = ( 10 ^ seq(10, -2, length = 100)),
+                      thresh = 1e-12)
+
+# Evaluate MSE of the model on on the test set for λ = 4
+# to do the prediction we set newx argument to test set
+ridge.predict <- predict(ridge.model, s=1000, newx = x[test,])
+
+print ("now find the MSE corresponding to λ = 4")
+mean((ridge.predict-y.test)^2)
+
+print ("just for comarison we use intercept to predict and calculate the MSE
+       (λ is set to a very large value)")
+ridge.predict <- predict(ridge.model, s=1e+10, newx = x[test,])
+
+mean((ridge.predict-y.test)^2)
+
+print ("now compare Ridge with usuall regression (i.e when λ = 0)")
+# we set exact to T otherwise predict() function will 
+# interpolate over the grid of λ values
+ridge.predict <- predict(ridge.model, s=0, newx = x[test,],
+                         exact = T, x = x[train,], y=y[train])
+
+# calculate MSE
+mean((ridge.predict - y.test)^2)
+
+# if we want to fit a (unpenalized) least squares model, then we should use the
+# lm() function, since that function provides more useful outputs, such as 
+# standard errors and p-values for the coefficients.
+
+
+```
+
+
+```{r Ridge regression and finding best value of λ using CV}
+
+library(tidyverse)
+library(glmnet)
+
+hitters.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Hitters.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+# -------------- Usual clean up first ------------------#
+
+# First remove all recods with spaces in character column Salary
+hitters.df$Salary <- gsub('\\s+', '', hitters.df$Salary)
+
+# Second remove all leading and trailing spaces from a character column "Salary"
+hitters.df$Salary <- trimws(hitters.df$Salary, which = c("both"))
+
+# Remove all records with "NA" or empty string in character column "Salary"
+hitters.df <- hitters.df[!(tolower(hitters.df$Salary) == "na" | 
+                           hitters.df$Salary == ""), ]
+
+# convert Salary column to numeric
+hitters.df$Salary <- as.numeric(as.character(hitters.df$Salary))
+
+# convert all character fields to factor
+hitters.df[sapply(hitters.df, is.character)] <- 
+  lapply(hitters.df[sapply(hitters.df, is.character)], as.factor)
+
+# Find and remove NA in all columns 
+hitters.df <- na.omit(hitters.df)
+
+
+x <- model.matrix(Salary~., hitters.df)[, -1] # -1 is to drop the Intercept
+y <- hitters.df$Salary
+
+set.seed(10)
+train <- sample(1:nrow(x), nrow(x)/2)
+test <- (-train)
+
+# Built-in cross-validation function, cv.glmnet(). 
+# By default, the function performs ten-fold cross-validation, 
+# though this can be changed using the argument nfolds.
+# we aaply ot on training portion of the data to find the λ
+# then we run the final model with the lamda on test data to get MSE
+
+cv.out=cv.glmnet(x[train ,],y[train],alpha=0)
+plot(cv.out)
+(bestlam=cv.out$lambda.min)
+
+# What is the test MSE associated with this value of λ?
+
+# Fit ridge regression model to trainig data
+ridge.model <- glmnet(x[train, ], y[train], alpha=0, 
+                      lambda = ( 10 ^ seq(10, -2, length = 100)),
+                      thresh = 1e-12)
+
+ridge.pred=predict(ridge.model,s=bestlam ,newx=x[test,])
+mean((ridge.pred-y[test])^2)
+
+
+# now let's split the data into train / test and train 
+# the model on train data , get the best lambda and then run it on test portion 
+# with the best lambda we got to see the testMSE:
+
+cv.out <- cv.glmnet(x[train, ], y[train], alpha=0)
+plot(cv.out)
+(best.lambda <- cv.out$lambda.min)
+
+ridge.pred <- predict(cv.out, s=bestlam, newx = x[test, ])
+sprintf("mean error on test data using %s is %s", bestlam, mean((ridge.pred - y[test])^ 2))
+mean((ridge.pred - y[test])^ 2)
+
+
+# finally we refit the model on the whole data and use the best λ calculated 
+# in CV
+cv.out=cv.glmnet(x,y,alpha=0)
+plot(cv.out)
+predict(cv.out, type="coefficients" ,s=bestlam )
+
+```
+```{r Ridge for logistic regression using CV to find best λ }
+
+library(tidyverse)
+library(glmnet)
+
+weekly.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+
+str(weekly.df)
+
+# -------------- Usual clean up first ------------------#
+
+# First remove all recods with spaces in character column Direction
+weekly.df$Direction <- gsub('\\s+', '', weekly.df$Direction)
+
+# Second remove all leading and trailing spaces from a character column "Direction"
+weekly.df$Direction <- trimws(weekly.df$Direction, which = c("both"))
+
+# Remove all records with "NA" or empty string in character column "Direction"
+weekly.df <- weekly.df[!(tolower(weekly.df$Direction) == "na" | 
+                           weekly.df$Direction == ""), ]
+
+# convert all character fields to factor
+weekly.df[sapply(weekly.df, is.character)] <-
+ lapply(weekly.df[sapply(weekly.df, is.character)], as.factor)
+
+# Find and remove NA in all columns 
+weekly.df <- na.omit(weekly.df)
+
+str(weekly.df)
+
+# contrasts(weekly.df$Direction)
+
+# now we use cross validation to find the best λ and corresponding coeffs
+
+# First construct matrix from dataframe (and drop intercept column)
+x <- model.matrix(Direction~., weekly.df)[,-1] 
+y <- ifelse(weekly.df$Direction == "Up", 1, 0)
+
+set.seed(10)
+
+# We’ll use the R function glmnet() [glmnet package] for computing penalized logistic regression.
+
+# Built-in cross-validation function, cv.glmnet(). 
+# By default, the function performs ten-fold cross-validation, 
+# though this can be changed using the argument nfolds.
+
+cv.out=cv.glmnet(x, y, family = "binomial", alpha=0, lambda = NULL)
+plot(cv.out)
+(bestlam=cv.out$lambda.min)
+
+# get the coefficients:
+predict(cv.out, type="coefficients" ,s=bestlam )
+
+print("Here is value of λ for which the MSE is minimum")
+cv.out$lambda.min
+
+print("Here is one standard error value of λ for which the MSE is minimum")
+cv.out$lambda.1se
+
+```
+
+```{r Lasso for logistic regression using CV to find best λ }
+
+library(tidyverse)
+library(glmnet)
+
+weekly.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+
+str(weekly.df)
+
+# -------------- Usual clean up first ------------------#
+
+# First remove all recods with spaces in character column Direction
+weekly.df$Direction <- gsub('\\s+', '', weekly.df$Direction)
+
+# Second remove all leading and trailing spaces from a character column "Direction"
+weekly.df$Direction <- trimws(weekly.df$Direction, which = c("both"))
+
+# Remove all records with "NA" or empty string in character column "Direction"
+weekly.df <- weekly.df[!(tolower(weekly.df$Direction) == "na" | 
+                           weekly.df$Direction == ""), ]
+
+# convert all character fields to factor
+weekly.df[sapply(weekly.df, is.character)] <-
+ lapply(weekly.df[sapply(weekly.df, is.character)], as.factor)
+
+# Find and remove NA in all columns 
+weekly.df <- na.omit(weekly.df)
+
+str(weekly.df)
+
+# contrasts(weekly.df$Direction)
+
+# now we use cross validation to find the best λ and corresponding coeffs
+
+# First construct matrix from dataframe (and drop intercept column)
+x <- model.matrix(Direction~., weekly.df)[,-1] 
+y <- ifelse(weekly.df$Direction == "Up", 1, 0)
+
+set.seed(10)
+# First construct matrix from dataframe (and drop intercept column)
+x <- model.matrix(Direction~., weekly.df)[,-1] 
+y <- ifelse(weekly.df$Direction == "Up", 1, 0)
+
+set.seed(10)
+
+# We’ll use the R function glmnet() [glmnet package] 
+# for computing penalized logistic regression.
+
+# Built-in cross-validation function, cv.glmnet(). 
+# By default, the function performs ten-fold cross-validation, 
+# though this can be changed using the argument nfolds.
+
+cv.out=cv.glmnet(x, y, family = "binomial", alpha=1, lambda = NULL)
+plot(cv.out)
+(bestlam=cv.out$lambda.min)
+
+# gget the coefficients:
+predict(cv.out, type="coefficients" ,s=bestlam )
+
+names(cv.out)
+
+print("Here is value of λ for which the MSE is minimum")
+cv.out$lambda.min
+
+print("Here is one standard error value of λ for which the MSE is minimum")
+cv.out$lambda.1se
+```
+
+
+
+```{r 671 Principal component regression}
+
+library(tidyverse)
+library(pls)
+
+
+hitters.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Hitters.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+# -------------- Usual clean up first ------------------#
+
+# First remove all recods with spaces in character column Salary
+hitters.df$Salary <- gsub('\\s+', '', hitters.df$Salary)
+
+# Second remove all leading and trailing spaces from a character column "Salary"
+hitters.df$Salary <- trimws(hitters.df$Salary, which = c("both"))
+
+# Remove all records with "NA" or empty string in character column "Salary"
+hitters.df <- hitters.df[!(tolower(hitters.df$Salary) == "na" | 
+                           hitters.df$Salary == ""), ]
+
+# convert Salary column to numberic
+hitters.df$Salary <- as.numeric(as.character(hitters.df$Salary))
+
+# convert all character fields 
+hitters.df[sapply(hitters.df, is.character)] <- 
+  lapply(hitters.df[sapply(hitters.df, is.character)], as.factor)
+
+# Find and remove NA in all columns 
+hitters.df <- na.omit(hitters.df)
+
+set.seed(2)
+
+# fit the model using pcr
+pcr.fit <- pcr(Salary ~ ., data = hitters.df, scale = T, validation="CV")
+
+print ("Summary:")
+summary(pcr.fit)
+
+
+# Note that although the minimum value of RSME is associated with 
+# M = 16 (which is very close to 19) but for M = 7 we get a drastic
+# decrease in RMSE which is very close to that of M = 17
+# This suggsts M=7 gives us good enough model
+validationplot(pcr.fit, val.type = "MSEP")
+
+# Now to see how model with 7 works on test data an compare it with 
+# model with M = 17 we split data into test and train and fit the model
+# on train 
+
+set.seed(1)
+train <- train <- sample(1:nrow(hitters.df), nrow(hitters.df)/2)
+test <- (-train)
+pcr.fit <- pcr(Salary ~ ., data=hitters.df, subset=train, scale=T, validation="CV")
+validationplot(pcr.fit, val.type = "MSEP")
+
+# now let's find the lowest cross validation error occurs M = 7 on the  model
+test.y <- hitters.df[test,]$Salary
+pcr.pred <- predict(pcr.fit, hitters.df[test,], ncomp = 7)
+
+sprintf("lowest MSE corresponding to M = 7 is %s (Ridge was 143257.45)",mean((pcr.pred-test.y)^2))
+mean((pcr.pred-test.y)^2)
+```
+
+```{r  Principal Component Analysis before LDA in CV}
+
+library(tidyverse)
+library(pls)
+
+weekly.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+# -------------- Usual clean up first ------------------#
+
+# First remove all recods with spaces in character column Direction
+weekly.df$Direction <- gsub('\\s+', '', weekly.df$Direction)
+
+# Second remove all leading and trailing spaces from a character column "Direction"
+weekly.df$Direction <- trimws(weekly.df$Direction, which = c("both"))
+
+# Remove all records with "NA" or empty string in character column "Direction"
+weekly.df <- weekly.df[!(tolower(weekly.df$Direction) == "na" | 
+                           weekly.df$Direction == ""), ]
+
+# convert all character fields to factor
+weekly.df[sapply(weekly.df, is.character)] <-
+ lapply(weekly.df[sapply(weekly.df, is.character)], as.factor)
+
+# Find and remove NA in all columns 
+weekly.df <- na.omit(weekly.df)
+
+# -------------------  outmost loop must be CV loop ---------------------
+# Note that as per "Tibshirani" cross validation must always be before
+# dimension reduction or feature selection
+# -----------------------------------------------------------------------
+
+k <- 10
+threshold <- 0.5
+
+folds <- sample(1:k, size = nrow(weekly.df), replace = T) 
+table(folds)
+
+# folds with same size
+# sameSizefolds <- sample(rep(1:k, length.out = nrow(weekly.df)), 
+#   size = nrow(weekly.df), replace = F)
+# table(sameSizefolds)
+
+results <- lapply (1:k, function(x) {  # x is the index of test portion, the rest are for training
+ 
+  #------------- calculate all PCA scores on k-1 trining fold -----------------
+  # First create predictor matrix and response vector on test and train folds
+  predictor.train.X <- model.matrix(Direction~., weekly.df[folds != x,])[, -1]
+  response.train.Y <- weekly.df[folds != x,]$Direction
+  
+  # use PCA to find principal components on k-1 trining fold:
+  pca.train <- princomp(predictor.train.X, cor=T) # PCA using correlation matrix
+  
+  # make a tibble from PCAs
+  weekly.pca.train <- as_tibble(pca.train$scores[,]*-1) %>% 
+    add_column(Direction=response.train.Y)
+
+  # Do exact same thing for test fold:
+  predictor.test.X <- model.matrix(Direction~., weekly.df[folds == x,])[, -1]
+  response.test.Y <- weekly.df[folds == x,]$Direction
+  
+  # use PCA to find principal components on test fold:
+  pca.test <- princomp(predictor.test.X, cor=T) # PCA using correlation matrix
+  
+  # make a tibble from PCAs
+  weekly.pca.test <- as_tibble(pca.test$scores[,]*-1) %>% 
+    add_column(Direction=response.test.Y)
+  
+  # get list of all pca column names
+  pca.cols <- colnames(weekly.pca.train[ , !(names(weekly.pca.train) %in% c("Direction"))])
+  
+  # An empty tibble to collect all result of running LDA on given test fold
+  pca.results <- tibble (no.of.pcas = NULL, 
+                      posterior.up = NULL,
+                      posterior.down = NULL,
+                      predicted = NULL,
+                      real = NULL)
+  
+  for (pc.col.idx in 1:length(pca.cols)){
+    
+    pca.chosen.cols <- pca.cols[1:pc.col.idx]
+    partial.weekly.pca.train <- weekly.pca.train[ ,pca.chosen.cols] %>% 
+      add_column(Direction=response.train.Y)
+  
+    # fit on train fold
+    lda.fit <- 
+      MASS::lda(as.formula(paste("Direction~", 
+                                 paste(pca.chosen.cols, collapse="+"))), 
+                data = partial.weekly.pca.train, family = binomial)
+
+    # predict on test fold
+    lda.pred <- predict(lda.fit, weekly.pca.test, type =  "response")
+    stopifnot(length (lda.pred$class) == length(weekly.pca.test$Direction))
+    pca.results <- rbind (pca.results, tibble (no.of.pcas = pc.col.idx, 
+                      posterior.up = lda.pred$posterior[, "Up"],
+                      posterior.down = lda.pred$posterior[, "Down"],
+                      predicted = lda.pred$class,
+                      real = weekly.pca.test$Direction))
+  }
+  return (pca.results)
+})
+
+# We have to find average of missclassification rate for each number of PCs 
+# cross all test folds
+
+# first calculte missclassification rate per each number of PCAs
+
+
+rates <- lapply(results, function (result) {
+  return(result %>% 
+           group_by(no.of.pcas) %>%
+           summarise(MSE = mean(predicted != real), 
+            FP_rates = table(predicted, real)[2,1]/(table(predicted, real)[2,1]+ table(predicted, real)[1,1]),
+            TP_rates = table(predicted, real)[2,2]/(table(predicted, real)[2,2]+ table(predicted, real)[1,2]),
+            precisions = table(predicted, real)[2,2]/(table(predicted, real)[2,2]+ table(predicted, real)[2,1]),
+            specificities = table(predicted, real)[2,1]/(table(predicted, real)[2,1]+ table(predicted, real)[1,1]),
+            nullClassifier = max( ( table(predicted, real)[1,1] + table(predicted, real)[2,1])/
+                                    (table(predicted, real)[1,1] + table(predicted, real)[2,1] + 
+                                       table(predicted, real)[1,2] + table(predicted, real)[2,2]),
+                                  table(predicted, real)[1,2] + table(predicted, real)[2,2])/
+                                    (table(predicted, real)[1,1] + table(predicted, real)[2,1] + 
+                                       table(predicted, real)[1,2] + table(predicted, real)[2,2])
+            ))
+})
+
+# Place rates for all folds in one df
+(all.rates = do.call(rbind, rates))
+
+# get mean of rates cross all folds per each mumber of pcs (1, 2, ..., 8) 
+(all.rates %>%
+  group_by(no.of.pcas) %>%
+  summarise(MSE = mean(MSE), 
+            FP_rates = mean(FP_rates),
+            TP_rates = mean(TP_rates),
+            precisions = mean(precisions),
+            specificities = mean(specificities),
+            nullClassifier = mean(nullClassifier))
+)
+
+# result shows 1 pca is the best , 2 or 3 number of PCAS areacceptable
+```
+```{r}
+library(tidyverse)
+library(pls)
+
+weekly.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+# -------------- Usual clean up first ------------------#
+
+# First remove all recods with spaces in character column Direction
+weekly.df$Direction <- gsub('\\s+', '', weekly.df$Direction)
+
+# Second remove all leading and trailing spaces from a character column "Direction"
+weekly.df$Direction <- trimws(weekly.df$Direction, which = c("both"))
+
+# Remove all records with "NA" or empty string in character column "Direction"
+weekly.df <- weekly.df[!(tolower(weekly.df$Direction) == "na" | 
+                           weekly.df$Direction == ""), ]
+
+# convert all character fields to factor
+weekly.df[sapply(weekly.df, is.character)] <-
+ lapply(weekly.df[sapply(weekly.df, is.character)], as.factor)
+
+# Find and remove NA in all columns 
+weekly.df <- na.omit(weekly.df)
+
+#----------------------- calculate all PCA scores ------------------------
+# First create predictor matrix and response vector
+predictorX <- model.matrix(Direction~., weekly.df)[, -1]
+responseY <- weekly.df$Direction
+
+# next use PCA to find principal components:
+(pca <- princomp(predictorX, cor=T)) # PCA using correlation matrix
+
+weekly.pca <- as_tibble(pca$scores[,]*-1) %>% 
+  add_column(Direction=responseY)
+
+(pca.cols <- colnames(weekly.pca[ , !(names(weekly.pca) %in% c("Direction"))]))
+
+result <- NULL
+
+for (pc.col.idx in 1:length(pca.cols)){
+  pca.chosen.cols <- pca.cols[1:pc.col.idx]
+  result <- bind_rows(result,c(no.of.pcas = pc.col.idx)) 
+}
+result
+```
+
+```{r createDataPartition bootstrap sample and other samples}
+
+# createDataPartition(
+#   y,
+#   times = 1,
+#   p = 0.5,
+#   list = TRUE,
+#   groups = min(5, length(y))
+# )
+# createFolds(y, k = 10, list = TRUE, returnTrain = FALSE)
+# 
+# createMultiFolds(y, k = 10, times = 5)
+# 
+# createTimeSlices(y, initialWindow, horizon = 1, fixedWindow = TRUE, skip = 0)
+# 
+# groupKFold(group, k = length(unique(group)))
+# 
+# createResample(y, times = 10, list = TRUE)
+# =============================================================================
+# Arguments
+# y: a vector of outcomes. For createTimeSlices, these should be in 
+#    chronological order.
+# times: the number of partitions to create
+# p : the percentage of data that goes to training
+# list : logical - should the results be in a list (TRUE) or a matrix with the 
+#       number of rows equal to floor(p * length(y)) and times columns.
+# groups: for numeric y, the number of breaks in the quantiles (see below)
+# k: an integer for the number of folds.
+# returnTrain : a logical. When true, the values returned are the sample 
+#               positions corresponding to the data used during training. 
+#               This argument only works in conjunction with list = TRUE
+# initialWindow: Initial number of consecutive values in each training set sample
+# horizon: Number of consecutive values in test set sample
+# fixedWindow: logical, if FALSE, all training samples start at 1
+# skip: integer, how many (if any) resamples to skip to thin the total amount
+# group: a vector of groups whose length matches the number of rows in the 
+#        overall data set.
+
+
+library(tidyverse)
+library(caret)
+library(glmnet)
+
+
+data(oil)
+createDataPartition(oilType, 2)
+
+x <- rgamma(50, 3, .5)
+inA <- createDataPartition(x, list = FALSE)
+
+plot(density(x[inA]))
+rug(x[inA])
+
+points(density(x[-inA]), type = "l", col = 4)
+rug(x[-inA], col = 4)
+
+createResample(oilType, 2)
+
+createFolds(oilType, 10)
+createFolds(oilType, 5, FALSE)
+
+createFolds(rnorm(21))
+
+createTimeSlices(1:9, 5, 1, fixedWindow = FALSE)
+createTimeSlices(1:9, 5, 1, fixedWindow = TRUE)
+createTimeSlices(1:9, 5, 3, fixedWindow = TRUE)
+createTimeSlices(1:9, 5, 3, fixedWindow = FALSE)
+
+createTimeSlices(1:15, 5, 3)
+createTimeSlices(1:15, 5, 3, skip = 2)
+createTimeSlices(1:15, 5, 3, skip = 3)
+
+set.seed(131)
+groups <- sort(sample(letters[1:4], size = 20, replace = TRUE))
+table(groups)
+folds <- groupKFold(groups)
+lapply(folds, function(x, y) table(y[x]), y = groups)
+
+```
 
