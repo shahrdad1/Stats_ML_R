@@ -30,7 +30,7 @@ hitters.df <- tibble(hitters.df)
 
 regfit.full <- regsubsets(Salary ~ ., hitters.df, nvmax = 19) 
 
-#The summary shows the result of step 2 of algorithm 6.3 page 209 of the book 
+#The summary shows the result of step 2 of algorithm 6.1 page 205 of the book 
 summary <- summary(regfit.full)
 
 names(summary)
@@ -42,7 +42,7 @@ coef(regfit.full,4)
 # plot Rsq , Cp and BIC 
 # par(mfrow=c(1,1))
 plot(summary$rss, xlab = "Number of variables", ylab="RSS",type = "l")
-plot(summary$adjr2,xlab = "Number of variables", ylab="Adjuster Rsquared",
+plot(summary$adjr2,xlab = "Number of variables", ylab="Adjusted Rsquared",
      type = "l")
 
 # which.max() returns location maximum point of the vector
@@ -56,7 +56,7 @@ points(index, summary$cp[index], col="red", cex=2, pch=20)
 
 # same for bic
 plot(summary$bic, xlab =" Numbers of variables", ylab="Bic", type="l")
-(index <- which.min(summary$cp))
+(index <- which.min(summary$bic))
 points(index, summary$bic[index], col="red", cex=2, pch=20)
 
 # regsubsets() has builtin plot() command that displays selected variables for 
@@ -69,6 +69,8 @@ plot(regfit.full,scale="bic")
 
 
 ```
+
+
 ```{r Lab 652 Forward and backward stepwise selection}
 library(tidyverse)
 library(leaps)
@@ -197,6 +199,7 @@ names(coef(best.fit, id = which.min(cv.error.means)))
 library(tidyverse)
 library(class)
 library(boot)
+library(leaps)
 
 set.seed(17)
 weekly.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Weekly.csv", 
@@ -293,8 +296,10 @@ which.min(cv.error.means)
 # seems like model with following 5 predictors has least MSE error on test data
 names(coef(best.fit, id = which.min(cv.error.means) ))
 
-
 ```
+
+
+
 ```{r Ridge regression }
 library(tidyverse)
 library(glmnet)
@@ -476,6 +481,8 @@ plot(cv.out)
 predict(cv.out, type="coefficients" ,s=bestlam )
 
 ```
+
+
 ```{r Ridge for logistic regression using CV to find best λ }
 
 library(tidyverse)
@@ -580,11 +587,6 @@ x <- model.matrix(Direction~., weekly.df)[,-1]
 y <- ifelse(weekly.df$Direction == "Up", 1, 0)
 
 set.seed(10)
-# First construct matrix from dataframe (and drop intercept column)
-x <- model.matrix(Direction~., weekly.df)[,-1] 
-y <- ifelse(weekly.df$Direction == "Up", 1, 0)
-
-set.seed(10)
 
 # We’ll use the R function glmnet() [glmnet package] 
 # for computing penalized logistic regression.
@@ -608,6 +610,7 @@ cv.out$lambda.min
 print("Here is one standard error value of λ for which the MSE is minimum")
 cv.out$lambda.1se
 ```
+
 
 
 
@@ -707,7 +710,7 @@ weekly.df <- na.omit(weekly.df)
 # Note that as per "Tibshirani" cross validation must always be before
 # dimension reduction or feature selection
 # -----------------------------------------------------------------------
-
+set.seed(1)
 k <- 10
 threshold <- 0.5
 
@@ -863,7 +866,7 @@ validationplot(pls.fit, val.type = "MSEP")
 # on train 
 
 set.seed(1)
-train <- train <- sample(1:nrow(hitters.df), nrow(hitters.df)/2)
+train <- sample(1:nrow(hitters.df), nrow(hitters.df)/2)
 test <- (-train)
 pls.fit <- plsr(Salary ~ ., data=hitters.df, subset=train, scale=T, validation="CV")
 summary(pls.fit)
@@ -871,13 +874,773 @@ validationplot(pls.fit, val.type = "MSEP")
 
 # now let's find the lowest cross validation error occurs M = 7 on the  model
 test.y <- hitters.df[test,]$Salary
-pls.pred <- predict(pcr.fit, hitters.df[test,], ncomp = 7)
+pls.pred <- predict(pls.fit, hitters.df[test,] %>% select(-Salary), ncomp = 7)
 
 sprintf("lowest MSE corresponding to M = 7 is %s (Ridge was 143257.45)",mean((pls.pred-test.y)^2))
 # PLSR really does not add that much value to PCR
 mean((pls.pred-test.y)^2)
 
 ```
+```{r Exercise 8}
+library(tidyverse)
+library(leaps)
+
+
+X <- rnorm(100)
+e <- rnorm(100)
+
+
+Y <- .02 + 1.6*X -2.2 * X^2 + 5.9*X^3 + e
+
+print("Part c:-----------------------------------------------------")
+
+df <- tibble(x1 = X, x2=X^2, x3=X^3, x4=X^4, x5=X^5, x6=X^6, x7=X^7, 
+             x8=X^8, x9=X^9, x10=X^10, y = Y)
+
+regfit.full <- regsubsets(y ~ ., df, nvmax = 10)
+
+#The summary shows the result of step 2 of algorithm 6.1 page 205 of the book 
+summary <- summary(regfit.full)
+
+plot(summary$rss, xlab = "Number of variables", ylab="RSS",type = "l")
+# which.max() returns location maximum point of the vector
+index <- which.max(summary$adjr2)
+plot(summary$adjr2,xlab = "Number of variables", ylab="Adjusted Rsquared",
+     type = "l")
+points(index, summary$adjr2[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (adjr2) : ")
+coef(regfit.full,index)
+# which.min() returns location minimum point of the vector
+index <- which.min(summary$cp)
+plot(summary$cp,xlab = "Number of variables", ylab="cp", type = "l")
+points(index, summary$cp[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (cp) : ")
+coef(regfit.full,index)
+# same for bic
+plot(summary$bic, xlab =" Numbers of variables", ylab="Bic", type="l")
+(index <- which.min(summary$bic))
+points(index, summary$bic[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (bic) : ")
+coef(regfit.full,index)
+
+# coef(, n) returns coefficient estimates associated with best n variable model
+
+
+
+print ("------------- use CV with best subset selection ------------------" )
+set.seed(1)
+k <- 10
+
+folds <- sample(1:k, size = nrow(df), replace = T) 
+table(folds)
+
+# folds with same size
+# sameSizefolds <- sample(rep(1:k, length.out = nrow(weekly.df)), 
+#   size = nrow(weekly.df), replace = F)
+# table(sameSizefolds)
+
+results <- lapply (1:k, function(j) {  # x is the index of test portion, the rest are for training
+
+  # this is to collect the MSEs for each test fold
+  mses <- tibble(no.of.coefs = NULL, MSE = NULL)
+  df.train <- df[folds != j, ]
+  df.test <- df[folds == j, ]
+  df.train.X <- df.train %>% select (-y)
+  df.test.X <- df.test %>% select (-y)
+  mat.test.X <- model.matrix(y~., data=df.test)
+  df.test.Y <- df.test$y
+  
+  # step 2 of algorithm 6.1 page 205 of the book 
+  regfit.full.train <- regsubsets(y ~ ., df.train, nvmax = ncol(df.train.X))
+  
+  # apply the model with selected subsets on test set 
+  # one at a time and cacluate the MSE
+  for (i in 1:ncol(df.test.X)){
+    (coefi <- coef(regfit.full.train, id = i))
+    (pred <- mat.test.X[, names(coefi)] %*% coefi)
+    (mse <- mean((pred - df.test.Y)^2))
+     mses <- rbind (mses, tibble(no.of.coefs = i, MSE = mse))
+  }
+  return(mses)
+})
+
+allResults <- results[[1]]
+for (i in 2 : length(results)){
+  allResults <- rbind(allResults , results[[i]])
+}
+
+(allMse <- (allResults %>%
+  group_by(no.of.coefs) %>%
+  summarise(mse.mean = mean(MSE))) )
+(idx <- which.min(allMse$mse.mean))
+print ("The best subset of features selected correspnd to minimum CV_MSE")
+# train on the whole training set now
+regfit.full.train <- regsubsets(y ~ ., df %>% select (-y), nvmax = ncol(df %>% select (-y)))
+coef(regfit.full.train, id = idx)
+
+#- -------------------------------------------------------------------------
+print ("part d : Use forward stepwise selection to find the best selected subsets  ------------------" )
+regfit.fwd <- regsubsets(y ~ ., df, nvmax = 10, method="forward")
+
+#The summary shows the result of step 2 of algorithm 6.2 page 207 of the book 
+summary <- summary(regfit.fwd)
+
+
+plot(summary$rss, xlab = "Number of variables", ylab="RSS",type = "l")
+
+# which.max() returns location maximum point of the vector
+index <- which.max(summary$adjr2)
+plot(summary$adjr2,xlab = "Number of variables", ylab="Adjusted Rsquared",
+     type = "l")
+points(index, summary$adjr2[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (adjr2) : ")
+coef(regfit.fwd,index)
+# which.min() returns location minimum point of the vector
+index <- which.min(summary$cp)
+plot(summary$cp, xlab =" Numbers of variables", ylab="Cp", type="l")
+points(index, summary$cp[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (cp) : ")
+coef(regfit.fwd,index)
+# same for bic
+index <- which.min(summary$bic)
+plot(summary$bic, xlab =" Numbers of variables", ylab="Bic", type="l")
+points(index, summary$bic[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (bic) : ")
+coef(regfit.fwd,index)
+
+
+print ("------------- use CV to find best forward stepwise selected model ------------------" )
+set.seed(1)
+k <- 10
+
+folds <- sample(1:k, size = nrow(df), replace = T) 
+table(folds)
+
+# folds with same size
+# sameSizefolds <- sample(rep(1:k, length.out = nrow(weekly.df)), 
+#   size = nrow(weekly.df), replace = F)
+# table(sameSizefolds)
+
+results <- lapply (1:k, function(x) {  # x is the index of test portion, the rest are for training
+  
+  # this is to collect the MSEs for each test fold
+  mses <- tibble(no.of.coefs = NULL, MSE = NULL)
+  
+  df.train <- df[folds != x, ]
+  df.test <- df[folds == x, ]
+  (df.train.X <- df.train %>% select (-y))
+  (df.test.X <- df.test %>% select (-y))
+  (mat.test.X <- model.matrix(y~., data=df.test))
+  (df.test.Y <- df.test$y)
+  
+  # step 2 of algorithm 6.2 page 207 of the book 
+  regfit.fwd.train <- regsubsets(y ~ ., df.train, 
+                                 nvmax = ncol(df.train.X), method="forward")
+  
+  # apply the model with selected subsets on test set 
+  # one at a time and cacluate the MSE
+  for (i in 1:ncol(df.test.X)){
+    (coefi <- coef(regfit.fwd.train, id = i))
+    (pred <- mat.test.X[, names(coefi)] %*% coefi)
+    (mse <- mean((pred - df.test.Y)^2))
+     mses <- rbind (mses, tibble(no.of.coefs = i, MSE = mse))
+  }
+  return(mses)
+})
+
+allResults <- results[[1]]
+for (i in 2 : length(results)){
+  allResults <- rbind(allResults , results[[i]])
+}
+
+(allMse <- (allResults %>%
+  group_by(no.of.coefs) %>%
+  summarise(mse.mean = mean(MSE))) )
+(idx <- which.min(allMse$mse.mean))
+print ("The forward features selected correspnd to minimum CV_MSE")
+# train on the whole training set now
+regfit.fwd.train <- regsubsets(y ~ ., df %>% select (-y), 
+                               nvmax = ncol(df %>% select (-y)),
+                               method = "forward")
+coef(regfit.fwd.train, id = idx)
+
+
+#----------------------------------------------------------------------------
+print("Part e: Fit lasso model and use cv to find the best value for lamda --------------------")
+#------------------------------------------------------------------------------
+
+library(glmnet)
+set.seed(1)
+
+# First construct matrix from dataframe (and drop intercept column)
+x <- model.matrix(y~., df)[,-1] 
+y <- df$y
+
+cv.out=cv.glmnet(x, y, alpha=1, lambda = NULL)
+plot(cv.out)
+
+print("Here is value of λ for which the MSE is minimum")
+(bestlam=cv.out$lambda.min)
+
+print("Here are the coefficients corresponding to best value of λ:")
+predict(cv.out, type="coefficients" ,s=bestlam )
+
+print ( "Lasso coefficients are not as close as that of all feature selections !!")
+
+print("Here is one standard error value of λ for which the MSE is minimum")
+one.SE.lam <- cv.out$lambda.1se
+
+print("Here are the coefficients corresponding to one standard error value of λ:")
+predict(cv.out, type="coefficients" ,s=one.SE.lam )
+
+
+#----------------------------------------------------------------------
+print("Part f: Perform Best subset selection and lasso on new data ------------")
+#-----------------------------------------------------------------------
+
+Y <- 12 - 45.3 * X^7
+df <- tibble(x1 = X, x2=X^2, x3=X^3, x4=X^4, x5=X^5, x6=X^6, x7=X^7, 
+             x8=X^8, x9=X^9, x10=X^10, y = Y)
+library(glmnet)
+set.seed(1)
+
+print ("Perform best subset selection: ")
+regfit.full <- regsubsets(y ~ ., df, nvmax = 10)
+
+#The summary shows the result of step 2 of algorithm 6.1 page 205 of the book 
+summary <- summary(regfit.full)
+
+plot(summary$rss, xlab = "Number of variables", ylab="RSS",type = "l")
+# which.max() returns location maximum point of the vector
+index <- which.max(summary$adjr2)
+plot(summary$adjr2,xlab = "Number of variables", ylab="Adjusted Rsquared",
+     type = "l")
+points(index, summary$adjr2[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (adjr2) : ")
+coef(regfit.full,index)
+# which.min() returns location minimum point of the vector
+index <- which.min(summary$cp)
+plot(summary$cp,xlab = "Number of variables", ylab="cp", type = "l")
+points(index, summary$cp[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (cp) : ")
+coef(regfit.full,index)
+# same for bic
+plot(summary$bic, xlab =" Numbers of variables", ylab="Bic", type="l")
+(index <- which.min(summary$bic))
+points(index, summary$bic[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (bic) : ")
+coef(regfit.full,index)
+
+# coef(, n) returns coefficient estimates associated with best n variable model
+
+
+
+print ("------ use CV with best subset selection for new data --------------" )
+set.seed(1)
+k <- 10
+
+folds <- sample(1:k, size = nrow(df), replace = T) 
+table(folds)
+
+# folds with same size
+# sameSizefolds <- sample(rep(1:k, length.out = nrow(weekly.df)), 
+#   size = nrow(weekly.df), replace = F)
+# table(sameSizefolds)
+
+results <- lapply (1:k, function(x) {  # x is the index of test portion, the rest are for training
+  
+  # this is to collect the MSEs for each test fold
+  mses <- tibble(no.of.coefs = NULL, MSE = NULL)
+  df.train <- df[folds != x, ]
+  df.test <- df[folds == x, ]
+  df.train.X <- df.train %>% select (-y)
+  df.test.X <- df.test %>% select (-y)
+  (mat.test.X <- model.matrix(y~., data=df.test))
+  (df.test.Y <- df[folds == x, ]$y)
+  
+  # step 2 of algorithm 6.1 page 205 of the book 
+  regfit.full.train <- regsubsets(y ~ ., df.train, nvmax = ncol(df.train.X))
+  
+  # apply the model with selected subsets on test set 
+  # one at a time and cacluate the MSE
+  for (i in 1:ncol(df.test.X)){
+    (coefi <- coef(regfit.full.train, id = i))
+    (pred <- mat.test.X[, names(coefi)] %*% coefi)
+    (mse <- mean((pred - df.test.Y)^2))
+     mses <- rbind (mses, tibble(no.of.coefs = i, MSE = mse))
+  }
+  return(mses)
+})
+
+allResults <- results[[1]]
+for (i in 2 : length(results)){
+  allResults <- rbind(allResults , results[[i]])
+}
+
+(allMse <- (allResults %>%
+  group_by(no.of.coefs) %>%
+  summarise(mse.mean = mean(MSE))) )
+(idx <- which.min(allMse$mse.mean))
+print ("The best subset of features selected correspnd to minimum CV_MSE")
+# train on the whole training set now
+regfit.full.train <- regsubsets(y ~ ., df %>% select (-y), nvmax = ncol(df %>% select (-y)))
+coef(regfit.full.train, id = idx)
+
+print(" Clearly applying CV on Best subset selection provides nonsensical result.")
+
+print ("Apply Lasso  cross validation to find the best λ and corresponding coeffs")
+library(glmnet)
+set.seed(1)
+
+# First construct matrix from dataframe (and drop intercept column)
+x <- model.matrix(y~., df)[,-1] 
+y <- df$y
+
+cv.out=cv.glmnet(x, y, alpha=1, lambda = NULL)
+plot(cv.out)
+
+print("Here is value of λ for which the MSE is minimum")
+(bestlam=cv.out$lambda.min)
+
+print("Here are the coefficients corresponding to best value of λ:")
+predict(cv.out, type="coefficients" ,s=bestlam )
+
+print("Here is one standard error value of λ for which the MSE is minimum")
+one.SE.lam <- cv.out$lambda.1se
+
+print("Here are the coefficients corresponding to one standard error value of λ:")
+predict(cv.out, type="coefficients" ,s=one.SE.lam )
+
+
+```
+
+```{r Exercise 9}
+library(tidyverse)
+library(glmnet)
+library(pls)
+library(leaps)
+
+set.seed(1)
+college.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/College.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+college.df = tibble(college.df)
+
+# str(college.df)
+
+#-------- Some usual cleaning on character columns ---------------- #
+
+# First remove all recods with spaces in character column Private
+college.df$Private <- gsub('\\s+', '', college.df$Private)
+
+# Second remove all leading and trailing spaces from a character column "Private"
+college.df$Private <- trimws(college.df$Private, which = c("both"))
+
+# Remove all records with "NA" or empty string in character column "Private"
+college.df <- college.df[!(tolower(college.df$Private) == "na" | 
+                           college.df$Private == ""), ]
+
+# convert all character fields 
+college.df[sapply(college.df, is.character)] <- 
+  lapply(college.df[sapply(college.df, is.character)], as.factor)
+
+#----------- Find and remove NA in all columns ------------- #
+college.df <- na.omit(college.df)
+
+# str(college.df)
+set.seed(1)
+print("a: Split into train / test data sets ---------------------")
+train <- sample(1:nrow(college.df), nrow(college.df)/2)
+test <- (-train)
+
+train.df <- college.df[train, ]
+test.df <- college.df[test, ]
+y.train <- train.df$Apps
+y.test <- test.df$Apps
+
+print("b: fit a linear model ------------------------------------")
+# fit a model
+df.lm <- lm (Apps ~ ., data = train.df)
+
+# Now predict  Apps for test data
+pred.lm <- predict(df.lm, test.df)
+
+print("Linear model test MSE:")
+(lm.MSE <- mean( (pred.lm - y.test)^2))
+
+print("c: fit Ridge regression model on training set and get test.mse-------------")
+
+# use magic model.matrix to convert dataframe into a matrix for Ridge and Lasso
+x.train <- model.matrix(Apps~., train.df)[, -1]
+x.test <- model.matrix(Apps~., test.df)[, -1]
+
+
+cv.out <- cv.glmnet(x.train, y.train, alpha=0) # Ridge
+plot(cv.out)
+best.lambda <- cv.out$lambda.min
+
+# predict the model on test
+pred.ridge <- predict(cv.out, s=best.lambda, newx=x.test)
+
+sprintf("Ridge test mse for best lambda: %s", best.lambda)
+(ridge.mse <- mean((pred.ridge - y.test)^2))
+
+print("d: fit Lasso regression model on training set and get test.mse and coeffs")
+
+cv.out <- cv.glmnet(x.train, y.train, alpha=1) # Lasso
+plot(cv.out)
+best.lambda <- cv.out$lambda.min
+
+# predict the model on test
+pred.lasso <- predict(cv.out, s=best.lambda, newx=x.test)
+
+sprintf("Lasso test mse for best lambda: %s", best.lambda)
+(lasso.mse <- mean((pred.lasso - y.test)^2))
+
+print("Coeffs for Lasso: ")
+(coefs.ridge <- predict (cv.out, type = "coefficients", s = best.lambda))
+
+print("e: Fit a PCR model on training set with M chosen by CS and get test.mse")
+
+pcr.fit <- pcr (Apps~., data=train.df, scale=T, validation="CV")
+
+
+validationplot(pcr.fit, val.type="MSEP")
+
+print("Minimum CV Root MSE is for M=17 components which is 100 so CV MSE is 10000")
+print("Looking at validation plot we see that M = 15 or 16  should suffice")
+
+# Now apply model 1ith M=17 on test data and calculate MSE'
+M = 17
+pcr.pred <- predict(pcr.fit, x.test, ncomp = M)
+sprintf("pcr test cv_mse for when best number of component is: %s", M)
+(pcr.mse <- mean((pcr.pred - y.test)^2))
+sprintf("pcr test mse  for best number of component: %s is %s:", M, pcr.mse)
+
+
+print("f: Fit a PLS model on training set with M chosen by CS and get test.mse")
+
+pls.fit <- plsr(Apps ~ ., data = college.df, subset = train, scale=T, validation = "CV")
+validationplot(pls.fit, val.type="MSEP")
+
+print("Minimum CV Root MSE is for M=13 components which is 1118")
+
+# Now apply model 1ith M=13 on test data and calculate MSE'
+M = 13
+pls.pred <- predict(pls.fit, x.test, ncomp = M)
+
+(pls.mse <- mean((pls.pred - y.test)^2))
+sprintf("pls test mse for for best number of component: %s is %s:", M, pls.mse)
+
+```
+
+```{r Exercise 10}
+library(tidyverse)
+library(glmnet)
+library(pls)
+library(leaps)
+
+print("a) Generate a data set with p = 20 features, n = 1,000")
+
+set.seed(10)
+X <- matrix(rep(NA, 1000 * 20), c(1000,20))
+for (i in 1: 20)
+  X[, i] <- rnorm(1000)
+
+e <- rnorm(1000)
+
+beta <- c(12,0,2.6, -123,0,11.2,56,-7,0,0,0,13,-41,2.2,0,8.7, -18,0,19,0.03)
+
+# name the features
+feature.names <- c("x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", 
+    "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x19", "x20" )
+colnames(X) <- feature.names
+names(beta) <- feature.names  
+beta
+
+Y <- rep(NA, 1000)
+
+for (i in 1 : 1000)
+  Y[[i]] <- beta %*% X[i, ] + e[[i]]
+
+# now split the samples into test and training:
+print("b) Split the data into train setcontaining 100 and test set containing 900")
+
+train <- sample(1:nrow(X), nrow(X)/10)
+test <- (-train)
+
+train.x <- X[train, ]
+train.y <- Y[train]
+
+test.x <- X[test, ]
+test.y <- Y[test]
+
+df.train.X <- as_tibble(train.x)
+df.train <- df.train.X %>% add_column(y = train.y, .before = "x1")
+df.test.X <- as_tibble(test.x)
+df.test <- df.test.X %>% add_column(y = test.y, .before = "x1")
+
+print("c) Perform best subset selection on training set:")
+regfit.full <- regsubsets(y ~ ., df.train, nvmax = 20)
+
+#The summary shows the result of step 2 of algorithm 6.1 page 205 of the book 
+summary <- summary(regfit.full)
+
+plot(summary$rss, xlab = "Number of variables", ylab="RSS",type = "l")
+
+print("d) Plot test MSE for model of each size")
+
+# First prepare test data as matrix, this is only for convinience 
+# when using dot product %*%: coefficients  %*% test.X rows
+df.test.mat <- model.matrix(y~., data = df.test)
+
+#  loop through all models , get the coefficients and calculate MSE
+mses <- rep(NA, 20)
+
+for (i in 1:20){
+  coeffs <- coef(regfit.full, i)
+  yhat <- df.test.mat[, names(coeffs)] %*% coeffs
+  mses[i]  <- mean((test.y - yhat)^2)
+}
+
+(mse_data <- tibble(comps = 1:20, mse=mses))
+ggplot(mse_data, aes(comps, mse))+
+  geom_line(color="blue")
+
+print("e) For model sise with 12 components MSE is minimized: 12 --> 1.234475")
+
+
+print("f) How does the model at which the test MSE is moinimized? compare the coeffs")
+
+(coeffs <- coef(regfit.full, 12))
+beta
+
+print("comparision shows all zero coefficients successfully predicted and non zero
+      coefficients are close approximation to real ones, only the 20th 
+      coefficient is missing ")
+
+
+print("
+ (Intercept)        x1           x3           x4         
+  0.1211867  11.9871248    2.6070986 -123.0928886      
+                 12.00       2.60      -123.00                     
+             
+                 x6           x7           x8      
+             10.9639610   56.0180802   -6.9507468  
+                11.20       56.00         -7.00    
+                
+                 x12          x13          x14     
+             13.1406636  -40.8673157    2.3919952  
+                 13.00      -41.00         2.20        
+                 
+                 
+                x16          x17          x19                
+             8.6684323  -17.9409391   18.9294841         
+               8.70       -18.00       19.00        0.03 
+")
+
+
+print("g) create a plot displaying ...")
+
+# loop over all models
+distance.squared <- rep(0, 20)
+
+for (i in 1:20){
+  (coeffs <- coef(regfit.full, i)[-1]) # drop the intercept
+  for (j in 1:i)
+    (distance.squared[i] <- distance.squared[i] + (coeffs [j] - beta[names(coeffs [j])])^2 )
+}
+dist <- sqrt(distance.squared)
+(distance.vs.model <- tibble(model = 1:20, distance = dist))
+
+ggplot(distance.vs.model, aes(model, distance))+
+  geom_line(color="red")
+
+print("As graph shows on model with 12 components (the model we found in part d) 
+the distance between two sets of coefficients are minimum")
+```
+
+```{r Exercise 11}
+library(tidyverse)
+library(glmnet)
+library(pls)
+library(leaps)
+
+
+boston.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/BostonHousing.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+str(boston.df)
+
+# Find and remove NA in all columns 
+boston.df <- na.omit(boston.df)
+set.seed(1)
+print("Split into train / test data sets ---------------------")
+train <- sample(1:nrow(boston.df), nrow(boston.df)/2)
+test <- (-train)
+
+df.train <- boston.df[train, ]
+df.test <- boston.df[test, ]
+train.y <- df.train$crim
+test.y <- df.test$crim
+
+
+
+print ("Perform best subset selection on train data: ")
+regfit.full <- regsubsets(crim ~ ., df.train, nvmax = 10)
+
+#The summary shows the result of step 2 of algorithm 6.1 page 205 of the book 
+summary <- summary(regfit.full)
+
+plot(summary$rss, xlab = "Number of variables", ylab="RSS",type = "l")
+# which.max() returns location maximum point of the vector
+index <- which.max(summary$adjr2)
+plot(summary$adjr2,xlab = "Number of variables", ylab="Adjusted Rsquared",
+     type = "l")
+points(index, summary$adjr2[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (adjr2) : ")
+coef(regfit.full,index)
+# which.min() returns location minimum point of the vector
+index <- which.min(summary$cp)
+plot(summary$cp,xlab = "Number of variables", ylab="cp", type = "l")
+points(index, summary$cp[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (cp) : ")
+coef(regfit.full,index)
+# same for bic
+plot(summary$bic, xlab =" Numbers of variables", ylab="Bic", type="l")
+(index <- which.min(summary$bic))
+points(index, summary$bic[index], col="red", cex=2, pch=20)
+print("coefficients of the best model (bic) : ")
+coef(regfit.full,index)
+
+print("looks a subset of three variables provides a model with acceptable performance")
+
+
+print ("------ use CV with best subset selection  --------------" )
+
+k <- 10
+
+folds <- sample(1:k, size = nrow(df), replace = T) 
+table(folds)
+
+# folds with same size
+# sameSizefolds <- sample(rep(1:k, length.out = nrow(weekly.df)), 
+#   size = nrow(weekly.df), replace = F)
+# table(sameSizefolds)
+
+results <- lapply (1:k, function(x) {  # x is the index of test portion, the rest are for training
+  
+  # this is to collect the MSEs for each test fold
+  mses <- tibble(no.of.coefs = NULL, MSE = NULL)
+  df.train.cv <- df.train[folds != x, ]
+  df.test.cv <- df.train[folds == x, ]
+  df.train.cv.X <- df.train.cv %>% select (-crim)
+  df.test.cv.X <- df.test.cv %>% select (-crim)
+  (mat.test.cv.X <- model.matrix(crim~., data=df.test.cv))
+  (df.test.cv.Y <- df.test.cv$crim)
+  
+  # step 2 of algorithm 6.1 page 205 of the book 
+  regfit.full.train <- regsubsets(crim ~ ., df.train.cv, 
+                                  nvmax = ncol(df.train.cv.X))
+  
+  # apply the model with selected subsets on test set 
+  # one at a time and cacluate the MSE on test fold
+  for (i in 1:ncol(df.test.cv.X)){
+    (coefi <- coef(regfit.full.train, id = i))
+    (pred <- mat.test.cv.X[, names(coefi)] %*% coefi)
+    (mse <- mean((pred - df.test.cv.Y)^2))
+     mses <- rbind (mses, tibble(no.of.coefs = i, MSE = mse))
+  }
+  return(mses)
+})
+
+allResults <- results[[1]]
+for (i in 2 : length(results)){
+  allResults <- rbind(allResults , results[[i]])
+}
+
+(allMse <- (allResults %>%
+  group_by(no.of.coefs) %>%
+  summarise(mse.mean = mean(MSE))) )
+
+print ("The best subset of features selected correspnd to minimum CV_MSE:")
+(idx <- which.min(allMse$mse.mean))
+
+print("However looking at the data shows sebset of features with 9 components 
+      is very close to the minimum we found so we use it")
+
+M=9
+sprintf(" Now apply the the model with %s No. of components to test data:", idx)
+coefi <- coef(regfit.full.train, id = M)
+
+mat.df.test <- model.matrix(crim~., df.test)
+yhat <- mat.df.test[, names(coefi)] %*% coefi
+
+mse.best.subset <- mean ((test.y - yhat)^2)
+sprintf( "------------ MSE on test data for best model with 8 component: %s", 
+         mse.best.subset)
+
+
+print("c: fit Ridge regression model on training set and get test.mse-------------")
+
+# use magic model.matrix to convert dataframe into a matrix for Ridge and Lasso
+x.train <- model.matrix(crim~., df.train)[, -1]
+y.train <- (df.train)$crim
+x.test <- model.matrix(crim~., df.test)[, -1]
+y.test <- df.test$crim
+
+cv.out <- cv.glmnet(x.train, y.train, alpha=0) # Ridge
+plot(cv.out)
+best.lambda <- cv.out$lambda.min
+
+# predict the model on test
+pred.ridge <- predict(cv.out, s=best.lambda, newx=x.test)
+
+sprintf("Ridge test cv_mse for best lambda: %s", best.lambda)
+ridge.mse <- mean((pred.ridge - y.test)^2)
+
+sprintf( "-----------Ridge MSE on test data for model with best lambda %s is %s", 
+         best.lambda, ridge.mse)
+
+print("fit Lasso regression model on training set and get test.mse ")
+
+cv.out <- cv.glmnet(x.train, y.train, alpha=1) # Lasso
+plot(cv.out)
+best.lambda <- cv.out$lambda.min
+
+# predict the model on test
+pred.lasso <- predict(cv.out, s=best.lambda, newx=x.test)
+
+sprintf("Lasso test cv_mse for best lambda: %s", best.lambda)
+lasso.mse <- mean((pred.lasso - y.test)^2)
+
+sprintf( "-----------Lasso MSE on test data for model with best lambda %s is %s", 
+         best.lambda, lasso.mse)
+
+
+print("Fit a PCR model on training set with M chosen by CS and get test.mse")
+
+pcr.fit <- pcr (crim~., data=df.train, scale=T, validation="CV")
+
+validationplot(pcr.fit, val.type="MSEP")
+
+print("Minimum CV Root MSE is for M=4 components which is 50 so CV MSE is 2500")
+
+# Now apply model 1ith M=17 on test data and calculate MSE'
+M = 4
+pcr.pred <- predict(pcr.fit, x.test, ncomp = M)
+pcr.mse <- mean((pcr.pred - y.test)^2)
+sprintf("pcr test mse  for best number of component: %s is %s:", M, pcr.mse)
+
+sprintf("b) best subset selection has the best test MSE: %s 
+        comparing with Ridge test MSE %s, Lasso test MSE %s 
+        and PCR test %s MSEtherefore we prefer it to other three",
+        mse.best.subset, ridge.mse, lasso.mse, pcr.mse)
+
+sprintf("c) Best  subset selection only includes %s number of components
+        probably because other features add noise",M)
+```
+
 
 ```{r createDataPartition bootstrap sample and other samples}
 
@@ -956,6 +1719,8 @@ groups <- sort(sample(letters[1:4], size = 20, replace = TRUE))
 table(groups)
 folds <- groupKFold(groups)
 lapply(folds, function(x, y) table(y[x]), y = groups)
+
+
 
 ```
 
