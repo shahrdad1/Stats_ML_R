@@ -344,12 +344,12 @@ grid <- 10 ^ seq(10, -2, length = 100)
 # alpha = 0 causes Ridge to be applied
 ridge.model <- glmnet(x, y, alpha=0, lambda = grid)
 
-# there are 100 values for λ and associated to each we have 
+# there are 100 values for lambda and associated to each we have 
 # number of ncol(hitters.df) coefficients
 
 ridge.model$lambda[50]
 
-# get the coefficients corresponding to 50th λ:
+# get the coefficients corresponding to 50th lambda:
 rownames(coef(ridge.model))
 coef(ridge.model)[,50]
 
@@ -357,7 +357,7 @@ coef(ridge.model)[,50]
 # we drop first one to calculate L2 norm of the coefficints
 sqrt(sum(coef(ridge.model)[-1,50]^2))
 
-# we use predict to get a new value for coefficients for any given value of λ
+# we use predict to get a new value for coefficients for any given value of lambda
 predict(ridge.model, s = 51, type="coefficients")[1:20]
 
 # now split the samples into test and training:
@@ -371,22 +371,22 @@ ridge.model <- glmnet(x[train, ], y[train], alpha=0,
                       lambda = ( 10 ^ seq(10, -2, length = 100)),
                       thresh = 1e-12)
 
-# Evaluate MSE of the model on on the test set for λ = 4
+# Evaluate MSE of the model on on the test set for lambda = 4
 # to do the prediction we set newx argument to test set
 ridge.predict <- predict(ridge.model, s=1000, newx = x[test,])
 
-print ("now find the MSE corresponding to λ = 4")
+print ("now find the MSE corresponding to lambda = 4")
 mean((ridge.predict-y.test)^2)
 
 print ("just for comarison we use intercept to predict and calculate the MSE
-       (λ is set to a very large value)")
+       (lambda is set to a very large value)")
 ridge.predict <- predict(ridge.model, s=1e+10, newx = x[test,])
 
 mean((ridge.predict-y.test)^2)
 
-print ("now compare Ridge with usuall regression (i.e when λ = 0)")
+print ("now compare Ridge with usuall regression (i.e when lambda = 0)")
 # we set exact to T otherwise predict() function will 
-# interpolate over the grid of λ values
+# interpolate over the grid of lambda values
 ridge.predict <- predict(ridge.model, s=0, newx = x[test,],
                          exact = T, x = x[train,], y=y[train])
 
@@ -401,7 +401,7 @@ mean((ridge.predict - y.test)^2)
 ```
 
 
-```{r Ridge regression and finding best value of λ using CV}
+```{r Ridge regression and finding best value of lambda using CV}
 
 library(tidyverse)
 library(glmnet)
@@ -443,14 +443,14 @@ test <- (-train)
 # Built-in cross-validation function, cv.glmnet(). 
 # By default, the function performs ten-fold cross-validation, 
 # though this can be changed using the argument nfolds.
-# we aaply ot on training portion of the data to find the λ
+# we aaply ot on training portion of the data to find the lambda
 # then we run the final model with the lamda on test data to get MSE
 
 cv.out=cv.glmnet(x[train ,],y[train],alpha=0)
 plot(cv.out)
 (bestlam=cv.out$lambda.min)
 
-# What is the test MSE associated with this value of λ?
+# What is the test MSE associated with this value of lambda?
 
 # Fit ridge regression model to trainig data
 ridge.model <- glmnet(x[train, ], y[train], alpha=0, 
@@ -474,7 +474,7 @@ sprintf("mean error on test data using %s is %s", bestlam, mean((ridge.pred - y[
 mean((ridge.pred - y[test])^ 2)
 
 
-# finally we refit the model on the whole data and use the best λ calculated 
+# finally we refit the model on the whole data and use the best lambda calculated 
 # in CV
 cv.out=cv.glmnet(x,y,alpha=0)
 plot(cv.out)
@@ -483,7 +483,7 @@ predict(cv.out, type="coefficients" ,s=bestlam )
 ```
 
 
-```{r Ridge for logistic regression using CV to find best λ }
+```{r Ridge for logistic regression using CV to find best lambda }
 
 library(tidyverse)
 library(glmnet)
@@ -517,7 +517,7 @@ str(weekly.df)
 
 # contrasts(weekly.df$Direction)
 
-# now we use cross validation to find the best λ and corresponding coeffs
+# now we use cross validation to find the best lambda and corresponding coeffs
 
 # First construct matrix from dataframe (and drop intercept column)
 x <- model.matrix(Direction~., weekly.df)[,-1] 
@@ -538,15 +538,15 @@ plot(cv.out)
 # get the coefficients:
 predict(cv.out, type="coefficients" ,s=bestlam )
 
-print("Here is value of λ for which the MSE is minimum")
+print("Here is value of lambda for which the MSE is minimum")
 cv.out$lambda.min
 
-print("Here is one standard error value of λ for which the MSE is minimum")
+print("Here is one standard error value of lambda for which the MSE is minimum")
 cv.out$lambda.1se
 
 ```
 
-```{r Lasso for logistic regression using CV to find best λ }
+```{r Lasso for logistic regression using CV to find best lambda }
 
 library(tidyverse)
 library(glmnet)
@@ -580,7 +580,7 @@ str(weekly.df)
 
 # contrasts(weekly.df$Direction)
 
-# now we use cross validation to find the best λ and corresponding coeffs
+# now we use cross validation to find the best lambda and corresponding coeffs
 
 # First construct matrix from dataframe (and drop intercept column)
 x <- model.matrix(Direction~., weekly.df)[,-1] 
@@ -604,10 +604,10 @@ predict(cv.out, type="coefficients" ,s=bestlam )
 
 names(cv.out)
 
-print("Here is value of λ for which the MSE is minimum")
+print("Here is value of lambda for which the MSE is minimum")
 cv.out$lambda.min
 
-print("Here is one standard error value of λ for which the MSE is minimum")
+print("Here is one standard error value of lambda for which the MSE is minimum")
 cv.out$lambda.1se
 ```
 
@@ -975,7 +975,8 @@ for (i in 2 : length(results)){
 (idx <- which.min(allMse$mse.mean))
 print ("The best subset of features selected correspnd to minimum CV_MSE")
 # train on the whole training set now
-regfit.full.train <- regsubsets(y ~ ., df %>% select (-y), nvmax = ncol(df %>% select (-y)))
+
+regfit.full.train <- regsubsets(y ~ ., df , nvmax = ncol(df %>% select (-y)))
 coef(regfit.full.train, id = idx)
 
 #- -------------------------------------------------------------------------
@@ -1059,8 +1060,7 @@ for (i in 2 : length(results)){
 (idx <- which.min(allMse$mse.mean))
 print ("The forward features selected correspnd to minimum CV_MSE")
 # train on the whole training set now
-regfit.fwd.train <- regsubsets(y ~ ., df %>% select (-y), 
-                               nvmax = ncol(df %>% select (-y)),
+regfit.fwd.train <- regsubsets(y ~ ., df , nvmax = ncol(df %>% select (-y)),
                                method = "forward")
 coef(regfit.fwd.train, id = idx)
 
@@ -1079,18 +1079,18 @@ y <- df$y
 cv.out=cv.glmnet(x, y, alpha=1, lambda = NULL)
 plot(cv.out)
 
-print("Here is value of λ for which the MSE is minimum")
+print("Here is value of lambda for which the MSE is minimum")
 (bestlam=cv.out$lambda.min)
 
-print("Here are the coefficients corresponding to best value of λ:")
+print("Here are the coefficients corresponding to best value of lambda:")
 predict(cv.out, type="coefficients" ,s=bestlam )
 
 print ( "Lasso coefficients are not as close as that of all feature selections !!")
 
-print("Here is one standard error value of λ for which the MSE is minimum")
+print("Here is one standard error value of lambda for which the MSE is minimum")
 one.SE.lam <- cv.out$lambda.1se
 
-print("Here are the coefficients corresponding to one standard error value of λ:")
+print("Here are the coefficients corresponding to one standard error value of lambda:")
 predict(cv.out, type="coefficients" ,s=one.SE.lam )
 
 
@@ -1183,12 +1183,12 @@ for (i in 2 : length(results)){
 (idx <- which.min(allMse$mse.mean))
 print ("The best subset of features selected correspnd to minimum CV_MSE")
 # train on the whole training set now
-regfit.full.train <- regsubsets(y ~ ., df %>% select (-y), nvmax = ncol(df %>% select (-y)))
+regfit.full.train <- regsubsets(y ~ ., df, nvmax = ncol(df %>% select (-y)))
 coef(regfit.full.train, id = idx)
 
 print(" Clearly applying CV on Best subset selection provides nonsensical result.")
 
-print ("Apply Lasso  cross validation to find the best λ and corresponding coeffs")
+print ("Apply Lasso  cross validation to find the best lambda and corresponding coeffs")
 library(glmnet)
 set.seed(1)
 
@@ -1199,16 +1199,16 @@ y <- df$y
 cv.out=cv.glmnet(x, y, alpha=1, lambda = NULL)
 plot(cv.out)
 
-print("Here is value of λ for which the MSE is minimum")
+print("Here is value of lambda for which the MSE is minimum")
 (bestlam=cv.out$lambda.min)
 
-print("Here are the coefficients corresponding to best value of λ:")
+print("Here are the coefficients corresponding to best value of lambda:")
 predict(cv.out, type="coefficients" ,s=bestlam )
 
-print("Here is one standard error value of λ for which the MSE is minimum")
+print("Here is one standard error value of lambda for which the MSE is minimum")
 one.SE.lam <- cv.out$lambda.1se
 
-print("Here are the coefficients corresponding to one standard error value of λ:")
+print("Here are the coefficients corresponding to one standard error value of lambda:")
 predict(cv.out, type="coefficients" ,s=one.SE.lam )
 
 
@@ -1570,10 +1570,14 @@ print("However looking at the data shows sebset of features with 9 components
       is very close to the minimum we found so we use it")
 
 M=9
-sprintf(" Now apply the the model with %s No. of components to test data:", idx)
-coefi <- coef(regfit.full.train, id = M)
 
-mat.df.test <- model.matrix(crim~., df.test)
+regfit.full.train <- regsubsets(crim ~ ., df.train, 
+                                  nvmax = ncol(df.train) - 1)
+
+sprintf(" Now apply the the model with %s No. of components to test data:", idx)
+(coefi <- coef(regfit.full.train, id = M))
+
+(mat.df.test <- model.matrix(crim~., df.test))
 yhat <- mat.df.test[, names(coefi)] %*% coefi
 
 mse.best.subset <- mean ((test.y - yhat)^2)
