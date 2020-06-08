@@ -223,6 +223,7 @@ weekly.df[sapply(weekly.df, is.character)] <-
   lapply(weekly.df[sapply(weekly.df, is.character)], as.factor)
 
 #----------- Find and remove NA in all columns ------------- #
+
 weekly.df <- na.omit(weekly.df)
 
 # ---------- stepwise forward feature selectin with CV -----------#

@@ -1,0 +1,246 @@
+---
+title: "ISLR CH7 Exercises"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r apply lapply and sapply}
+
+# apply wors like reduce() (sum over columns (or rows) of a matrix or a tibble)
+(m1 <- matrix(C<-(1:10),nrow=5, ncol=6))
+(a_m1 <- apply(m1, 2, sum)) 
+
+# apply on tibble (reduce on columns)
+(a_tibble <- as_tibble(m1))
+(a_m2 <- apply(a_tibble, 2, sum)) 
+
+# lApply (apply a function over a list (or tibble as a list of columns) and return a new list)
+movies <- c("SPYDERMAN","BATMAN","VERTIGO","CHINATOWN")
+movies_lower <-lapply(movies, tolower)
+str(movies_lower)
+
+# lapply on tible returns a list and then 
+(a_list <- lapply(a_tibble, function(x) {x*2}))
+
+# sapply() function takes list, vector or data frame as input and gives output 
+# in vector or matrix
+(matrix <-sapply(a_tibble, function(x) {x*2}))
+
+# We can use lapply() or sapply() interchangeable to slice a data frame
+below_ave <- function(x) {  
+    ave <- mean(x) 
+    return(x[x > ave])
+}
+
+(dt_s<- as_tibble(sapply(a_tibble, below_ave)))
+(dt_l<- as_tibble(lapply(a_tibble, below_ave)))
+identical(dt_s, dt_l)
+
+# tapply() computes a measure (mean, median, min, max, etc..) or a function for 
+# each factor variable in a vector. It is a very useful function that lets you 
+# create a subset of a vector and then apply some functions to each of the subset.
+
+# -X: An object, usually a vector
+# -INDEX: A list containing factor
+# -FUN: Function applied to each element of x
+
+#As a prior work, we can compute the median of the length for each species. 
+# tapply() is a quick way to perform this computation.
+
+data(iris)
+tapply(iris$Sepal.Width, iris$Species, median)
+
+
+# remove any row that has at least one empty string value 
+(df1 <- tibble(x=c("" , " ", "  abc  " ,"", "  de","f  "), 
+              y=c("12", "  54", "  ", "  c12  ", "  ", "  No  "))
+)
+
+
+(df2 <- as_tibble(sapply(df1, function(the_col) gsub("\\s+", "", the_col))))
+
+trim.f <- function(x) trimws(x, which = c("both"))
+space.f <- function(x) gsub("\\s+", NA, x)
+empty.f <- function(x) gsub("^$", NA, x)
+library(tidyverse)
+df1 %>%
+  mutate_each(funs(trim.f)) %>%
+  mutate_each(funs(space.f)) %>%
+  mutate_each(funs(empty.f))  %>%
+  na.omit
+
+  
+  
+
+```
+
+```{r fit polynomial (with cv to find the best degree) and step function}
+library(tidyverse)
+set.seed(1)
+wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+(wage.df.original = tibble(wage.df))
+(wage.df = tibble(wage.df))
+
+# first clean up NA and particularly character columns
+# 1) remove leading, trainling and empty characters from character columns
+
+trim.f <- function(x) trimws(x, which = c("both")) # leading and trailing spaces
+empty.f <- function(x) gsub("^$", NA, x) # empty strings
+
+wage.df[sapply(wage.df, is.character)] <- 
+  wage.df %>%
+    select(which(sapply(.,is.character))) %>%
+    mutate_each(funs(trim.f)) %>%
+    mutate_each(funs(empty.f))  %>%
+    na.omit
+
+
+sprintf("Any NA or empty string in character columns recognized: %s",
+        !identical(wage.df,wage.df.original) )
+
+# 2) It is safe now to convert all character fields into factors
+wage.df[sapply(wage.df, is.character)] <-
+  wage.df %>%
+  select(which(sapply(., is.character))) %>%
+  mutate_each(funs(factor))
+
+  
+# Now fit a 4 degree polynomial
+fit.poly <- lm(wage ~ poly(age, 4), data = wage.df)
+coef(summary(fit.poly))
+
+# draw standard error 
+# first get the range of the values of age
+(age.limits  <- range(wage.df$age))
+
+# Now create an interaval from these range values
+(age.grid <- seq(from=age.limits[1], to=age.limits[2]))
+
+# predict value for this interval using fitted model
+predicts <- predict(fit.poly, newdata = tibble(age=age.grid), se=T)
+names(predicts)
+
+se.bands <- cbind(predicts$fit + 2*predicts$se.fit, 
+                  predicts$fit - 2*predicts$se.fit)
+
+# now plot the predicts
+#par(mfrow=c(1,2), mar=c(4.5,4.5,1,1), oma=c(0,0,4,0))
+plot(wage.df$age, wage.df$wage, xlim=age.limits, cex=0.5, col="darkgrey")
+title("Degree 4 poly", outer = T)
+lines(age.grid, predicts$fit, lwd=2, col = "blue")
+matlines(age.grid, se.bands, lwd=2, col="red", lty=3)
+
+# use anova to find the best model between multiple nested models
+fit.1 <- lm(wage ~ age, data = wage.df)
+fit.2 <- lm(wage ~ poly(age, 2), data = wage.df)
+fit.3 <- lm(wage ~ poly(age, 3), data = wage.df)
+fit.4 <- lm(wage ~ poly(age, 4), data = wage.df)
+fit.5 <- lm(wage ~ poly(age, 5), data = wage.df)
+
+anova(fit.1, fit.2, fit.3, fit.4, fit.5)
+# --------------------------------------------------------------------------
+# However the best approach is using CV to choose best degree for polynomial
+#---------------------------------------------------------------------------
+# create k-fold 
+k <- 10
+degrees <- 1:10
+set.seed(1)
+
+# create k folds
+folds <- sample(1:k, nrow(wage.df), replace = T)
+
+# For folds with same size do:
+# sameSizefolds <- sample(rep(1:k, length.out = nrow(weekly.df)), 
+#                                        size = nrow(weekly.df), replace = F)
+# table(sameSizefolds)
+
+# perform a cross validation on a for loop
+mse.per.fold <- tibble(fold.id = NULL, degree = NULL, mse=NULL)
+for (dgr in degrees){
+  for (j in 1:k){
+    
+    # fit the polynomial model for given degree on training fold
+    
+    fit.poly <- lm(wage ~ poly(age, dgr), data = wage.df[folds != j, ])
+    # now predict on test fold
+    predicts <- predict(fit.poly, 
+                        newdata = list(age=wage.df[folds == j, ]$age), se=T)
+
+    # calculte the MSE 
+    mse.per.fold <- 
+      rbind(mse.per.fold, 
+            tibble(fold.id = j, degree = dgr, 
+                   mse=mean((predicts$fit - wage.df[folds == j, ]$wage)^2)))
+  }
+}
+
+# We have to find average of mse rate for each degree cross all test folds 
+
+
+(summary <- mse.per.fold %>%
+  group_by(degree) %>%
+  summarise(mse.mean = mean(mse)) 
+)
+
+# and then find the degree that has minimum mean.mse
+summary %>%
+  slice(which.min(mse.mean))
+
+# Now let's predict if an individual earns more than 20k per year
+
+fit <- glm(I(wage > 250) ~ poly(age,4), data = wage.df, family = binomial)
+
+# do the prediction using the model
+preds <- predict(fit, newdata=list(age=age.grid), se = T)
+
+# Note that predict function for glm model gets the prediction for logit i.e: 
+# log(Pr(Y=1 | X) / (1 - Pr(Y=1 | X))) = Xβ and also the standard error is 
+# of the same form, clealry to get prediction for Pr(Y=1|X) we need 
+# to calculate exp(Xβ)/(1+exp(Xβ))
+
+prob.predict <- exp(preds$fit)/(1+exp(preds$fit))
+se.bound.logit <- cbind(preds$fit + 2*preds$se, preds$fit - 2*preds$se)
+se.bound <- apply(se.bound.logit, 2, function(x) exp(x)/(1+exp(x)))
+
+# now plot the predicts
+#par(mfrow=c(1,2), mar=c(4.5,4.5,1,1), oma=c(0,0,4,0))
+plot(wage.df$age, I(wage.df$wage > 250), 
+     xlim=age.limits, cex=0.5, col="darkgrey")
+# we use jitter so that observation with the same value do not cover each other
+points(jitter(wage.df$age), I(wage.df$age>250)/5, 
+       cex=0.5, pch="|", col="darkgrey")
+title("Degree 4 poly", outer = T)
+lines(age.grid, prob.predict, lwd=2, col = "blue")
+matlines(age.grid, se.bound, lwd=2, col="red", lty=3)
+
+# let's fit a step function
+# we use cut() function to create knots
+table(cut(wage.df$age, 4))
+print("fit a step function using cut() or giving our cut points using break(): ")
+# let's fit a step function
+fit.step <- lm(wage ~ cut(age, 4), data=wage.df)
+coef(summary(fit))
+
+(age.limits  <- range(wage.df$age))
+
+# Now create an interaval from these range values
+(age.grid <- seq(from=age.limits[1], to=age.limits[2]))
+
+# predict value for this interval using fitted model
+predicts <- predict(fit.step, newdata = tibble(age=age.grid), se=T)
+
+se.bands <- cbind(predicts$fit + 2*predicts$se.fit, 
+                  predicts$fit - 2*predicts$se.fit)
+
+# now plot the predicts
+#par(mfrow=c(1,2), mar=c(4.5,4.5,1,1), oma=c(0,0,4,0))
+plot(wage.df$age, wage.df$wage, xlim=age.limits, cex=0.5, col="darkgrey")
+title("Degree 4 poly", outer = T)
+lines(age.grid, predicts$fit, lwd=2, col = "blue")
+matlines(age.grid, se.bands, lwd=2, col="red", lty=3)
+
+```
+
+
