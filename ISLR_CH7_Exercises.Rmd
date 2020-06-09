@@ -215,7 +215,7 @@ title("Degree 4 poly", outer = T)
 lines(age.grid, prob.predict, lwd=2, col = "blue")
 matlines(age.grid, se.bound, lwd=2, col="red", lty=3)
 
-# let's fit a step function
+print("----------- let's fit a step function --------------")
 # we use cut() function to create knots
 table(cut(wage.df$age, 4))
 print("fit a step function using cut() or giving our cut points using break(): ")
@@ -243,4 +243,111 @@ matlines(age.grid, se.bands, lwd=2, col="red", lty=3)
 
 ```
 
+
+```{r regression splines, natural spline, smoothing spline with CV and loess}
+library(tidyverse)
+library(splines)
+wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+(wage.df.original = tibble(wage.df))
+(wage.df = tibble(wage.df))
+
+# first clean up NA and particularly character columns
+# 1) remove leading, trainling and empty characters from character columns
+
+trim.f <- function(x) trimws(x, which = c("both")) # leading and trailing spaces
+empty.f <- function(x) gsub("^$", NA, x) # empty strings
+
+wage.df[sapply(wage.df, is.character)] <- 
+  wage.df %>%
+    select(which(sapply(.,is.character))) %>%
+    mutate_each(funs(trim.f)) %>%
+    mutate_each(funs(empty.f))  %>%
+    na.omit
+
+
+sprintf("Any NA or empty string in character columns recognized: %s",
+        !identical(wage.df,wage.df.original) )
+
+# 2) It is safe now to convert all character fields into factors
+wage.df[sapply(wage.df, is.character)] <-
+  wage.df %>%
+  select(which(sapply(., is.character))) %>%
+  mutate_each(funs(factor))
+
+# use df() to generate spline with knots at uniform quantiles
+dim(bs(wage.df$age, knots=c(25,40,60)))
+
+dim(bs(wage.df$age, df=6))
+
+# Fit wage to age using regression splines
+fit <- lm(wage~bs(age, knots = c(25,40,60)) ,data=wage.df)
+
+# first get the range of the values of age
+(age.limits  <- range(wage.df$age))
+
+# Now create an interaval from these range values
+(age.grid <- seq(from=age.limits[1], to=age.limits[2]))
+
+# predict the age values 
+pred <- predict(fit, newdata = list(age=age.grid), se=T)
+plot(wage.df$age, wage.df$wage, col="gray")
+lines(age.grid, pred$fit, lwd=2)
+se_bonds <- cbind(pred$fit+2*pred$se, pred$fit-2*pred$se)
+matlines(age.grid, se_bonds, lwd=2, col="red", lty=3)
+
+# use ns() to create a basis function for natural spline
+dim(ns(wage.df$age, knots=c(25,40,60))) # 3 + 3 - 2
+
+dim(ns(wage.df$age, df = 4))
+
+# Fit wage to age using natural spline
+fit2 <- lm(wage~ns(age, df = 4) ,data=wage.df)
+pred2 <- predict (fit2, newdata = list(age = age.grid), se=T)
+plot(wage.df$age, wage.df$wage, col="gray")
+lines(age.grid, pred2$fit, col="black", lwd=2)
+se_bonds <- cbind(pred2$fit+2*pred2$se, pred2$fit-2*pred2$se)
+matlines(age.grid, se_bonds, lwd=2, col="red", lty=3)
+
+
+# fit smoothing spline
+plot(wage.df$age, wage.df$wage, xlim=age.limits, cex=0.5, col="darkgrey")
+title("Smoothing spline")
+# first no cv, just hard code effective degree of freedom as 16
+fit.smooth=smooth.spline(wage.df$age, wage.df$wage, df=16)
+pred.smooth <- predict(fit.smooth, newdata = list(age=age.grid), se=T)
+title("Smoothing Spline with hard coded degree of freedom")
+plot(wage.df$age, wage.df$wage, col="gray")
+lines(age.grid, pred.smooth$fit, col="black", lwd=2)
+lines(fit.smooth, col="red", lwd=2)
+
+# second use cv to get the best effective degree of freedom
+fit.smooth.cv=smooth.spline(wage.df$age, wage.df$wage, cv=T)
+pred.smooth.cv <- predict(fit.smooth.cv, newdata = list(age=age.grid), se=T)
+
+sprintf("effective degree of freedom found by cv is %s",fit.smooth.cv$df)
+title("Smoothing Spline with CV")
+plot(wage.df$age, wage.df$wage, col="gray")
+lines(age.grid, pred.smooth.cv$fit.cv, col="black", lwd=2)
+lines(fit.smooth.cv, col="blue", lwd=2)
+
+# Fit local regression model
+plot(wage.df$age, wage.df$wage, col="gray")
+title("Local regression span = 0.2")
+fit.loess.1 <- loess(wage~age, span = 0.2, data = wage.df)
+fit.loess.2 <- loess(wage~age, span = 0.5, data = wage.df)
+pred.loess.1 <- predict(fit.loess.1, newdata = tibble(age=age.grid), se=T)
+pred.loess.2 <- predict(fit.loess.2, newdata = tibble(age=age.grid), se=T)
+
+lines(age.grid, pred.loess.1$fit, col="blue", lwd=2)
+se_bonds.loess.1 <- cbind(pred.loess.1$fit+2*pred.loess.1$se, pred.loess.1$fit-2*pred.loess.1$se)
+matlines(age.grid, se_bonds.loess.1, lwd=2, col="red", lty=3)
+
+plot(wage.df$age, wage.df$wage, col="gray")
+title("Local regression span = 0.4")
+lines(age.grid, pred.loess.2$fit, col="blue", lwd=2)
+se_bonds.loess.2 <- cbind(pred.loess.2$fit+2*pred.loess.2$se, pred.loess.2$fit-2*pred.loess.2$se)
+matlines(age.grid, se_bonds.loess.2, lwd=2, col="red", lty=3)
+
+```
 
