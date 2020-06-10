@@ -351,3 +351,41 @@ matlines(age.grid, se_bonds.loess.2, lwd=2, col="red", lty=3)
 
 ```
 
+```{r GAM}
+library(tidyverse)
+library(gam)
+wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+(wage.df.original = tibble(wage.df))
+(wage.df = tibble(wage.df))
+
+# first clean up NA and particularly character columns
+# 1) remove leading, trainling and empty characters from character columns
+
+trim.f <- function(x) trimws(x, which = c("both")) # leading and trailing spaces
+empty.f <- function(x) gsub("^$", NA, x) # empty strings
+
+wage.df[sapply(wage.df, is.character)] <- 
+  wage.df %>%
+    select(which(sapply(.,is.character))) %>%
+    mutate_each(funs(trim.f)) %>%
+    mutate_each(funs(empty.f))  %>%
+    na.omit
+
+
+sprintf("Any NA or empty string in character columns recognized: %s",
+        !identical(wage.df,wage.df.original) )
+
+# 2) It is safe now to convert all character fields into factors
+wage.df[sapply(wage.df, is.character)] <-
+  wage.df %>%
+  select(which(sapply(., is.character))) %>%
+  mutate_each(funs(factor))
+
+
+# Use lm() to do the GAM
+gam1 <- lm(wage ~ ns(year, 4) + ns(age, 5) + education, data=wage.df)
+
+gam.m3 <- gam(wage ~ s(year, 4) + s(age, 5) + education, data=wage.df)
+```
+
