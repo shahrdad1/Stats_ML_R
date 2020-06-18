@@ -351,9 +351,8 @@ matlines(age.grid, se_bonds.loess.2, lwd=2, col="red", lty=3)
 
 ```
 
-```{r GAM}
-library(tidyverse)
-library(gam)
+
+```{r GAM with CV}
 wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", 
                       header=T, stringsAsFactors = F, na.strings = "?")
 (wage.df.original = tibble(wage.df))
@@ -382,10 +381,234 @@ wage.df[sapply(wage.df, is.character)] <-
   select(which(sapply(., is.character))) %>%
   mutate_each(funs(factor))
 
+print("---------------- GAM with smoothing spline and CV :---------------- ")
+library(mgcv)
 
-# Use lm() to do the GAM
-gam1 <- lm(wage ~ ns(year, 4) + ns(age, 5) + education, data=wage.df)
+cv.gam <- gam(logwage~s(age, bs="cr") + s(year, bs="cr", k=5) + education, 
+              method="GACV.Cp", scale=-1, data=wage.df,family=Gamma(link=log), 
+              gamma=1.4)
+print("----------------- cv.gam model ---------------------")
+print(cv.gam)
+print("------ anova for approximate signifiocance of terms of cv.gam ---------")
+anova(cv.gam)
+print("----------------- summary cv.gam1 ---------------------")
+summary(cv.gam)
 
-gam.m3 <- gam(wage ~ s(year, 4) + s(age, 5) + education, data=wage.df)
+
+plot(cv.gam, too.far=0.15)
+
+#residuals(cv.gam)
+
+#print("----------------- check ---------------------")
+#gam.check(cv.gam)
+
+# plot (cv.gam, residuals=T, select=1)
+# title("age vs s(age)")
+# 
+# plot (cv.gam, residuals=T, select=2)
+# title("year vs s(year)")
+
+cv.gam1 <- gam(logwage~s(age, bs="cr") + s(year, bs="cr", k=5) +te(age, year, k=5) + education, 
+              method="GACV.Cp", scale=-1, data=wage.df,family=Gamma(link=log), 
+              gamma=1.4)
+
+print("----------------- cv.gam1 model ---------------------")
+print(cv.gam1)
+print("------ anova for approximate signifiocance of terms of cv.gam1 ---------")
+anova(cv.gam1)
+print("----------------- summary cv.gam1 ---------------------")
+summary(cv.gam1)
+
+plot(cv.gam1, too.far=0.15)
+
+# predict
+pred <- predict(cv.gam, newdata = wage.df, se=TRUE,type="terms")
+
+
 ```
+
+```{r GAM with GCV for stock data}
+library(tidyverse)
+library(mgcv)
+library(purrr)
+
+smarket.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Smarket.csv", 
+           header=T, stringsAsFactors = F, na.strings = "?")
+
+smarket.df = as_tibble(smarket.df)
+smarket.df.original = as_tibble(smarket.df)
+
+# first clean up NA and particularly character columns
+# 1) remove leading, trainling and empty characters from character columns
+
+trim.f <- function(x) trimws(x, which = c("both")) # leading and trailing spaces
+empty.f <- function(x) gsub("^$", NA, x) # empty strings
+
+smarket.df[sapply(smarket.df, is.character)] <- 
+  smarket.df %>%
+    select(which(sapply(.,is.character))) %>%
+    mutate_each(funs(trim.f)) %>%
+    mutate_each(funs(empty.f))  %>%
+    na.omit
+
+
+sprintf("Any NA or empty string in character columns recognized: %s",
+        !identical(smarket.df,smarket.df.original) )
+
+# 2) It is safe now to convert all character fields into factors
+smarket.df[sapply(smarket.df, is.character)] <-
+  smarket.df %>%
+  select(which(sapply(., is.character))) %>%
+  mutate_each(funs(factor))
+
+# split to test train
+train <- smarket.df$Year < 2005
+test <- !train
+
+
+# Use Gam
+# it returns logit{E(yi)}
+cv.gam1 <- gam(Direction~ s(Year, bs="cr", k=4)+
+                 s(Volume, k=20)+s(Lag1, k=20),
+              method="GACV.Cp", scale=-1, data=smarket.df,subset = train,
+              family=binomial(link=logit))
+str(smarket.df)
+print("----------------- cv.gam model ---------------------")
+print(cv.gam1)
+print("------ anova for approximate signifiocance of terms of cv.gam ---------")
+anova(cv.gam1)
+print("----------------- summary cv.gam1 ---------------------")
+summary(cv.gam1)
+print("----------------- check cv.gam1 ---------------------")
+gam.check(cv.gam1)
+
+# plot(cv.gam1, too.far=0.15)
+
+
+# predict the test model
+pred <- predict(cv.gam1, newdata = smarket.df[test,], se=TRUE)
+preds <- pred$fit
+# Note pred$fit is logit, we need to convert it to probability
+
+logit.inverse <- function(logit) {
+  odds <- exp(logit)
+  odds/(1+odds)
+}
+
+gam.probs <- map(preds, logit.inverse)
+
+# let's draw probabilities vs logit to see if it makes sense
+library(ggplot2)
+ggplot(tibble(x=preds), aes(x = x)) +
+        stat_function(fun = logit.inverse) + 
+  scale_x_continuous(name = "logit") +
+        scale_y_continuous(name = "Probability")
+
+# calculate test.mse
+gam.pred <- ifelse(gam.probs > threshold, "Up", "Down")
+
+missclassificationRate = NULL
+nullClassificationRate = NULL
+FP_rates = NULL
+TP_rates = NULL
+precisions = NULL
+specificities = NULL
+confusionTables = NULL
+aucs = NULL
+
+library(pROC)
+df <- smarket.df[test,]
+
+confusion_table <- table(gam.pred, smarket.df[test,]$Direction)
+  
+nullClassifier <- max(
+    (confusion_table[1,1] + confusion_table[2,1])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ), 
+    (confusion_table[1,2] + confusion_table[2,2])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ))
+  
+nullClassificationRate <- c(nullClassificationRate, nullClassifier)
+roc_obj <- roc(df$Direction, purrr::flatten_dbl(gam.probs))
+
+# Let's draw some AUC plots
+plot(roc_obj, legacy.axes = TRUE)
+
+aucs <- c(aucs, auc(roc_obj))
+
+missclassificationRate <- c(missclassificationRate, mean(gam.pred != smarket.df[test,]$Direction))
+FP_rates <- c(FP_rates, confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
+TP_rates <- c(TP_rates, confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
+precisions <- c(precisions, confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
+specificities <- c(specificities , 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]) )
+
+# overall fraction of wrong predictions:
+# print(confusion_table)
+
+# average missclassification error rate
+sprintf("GAM classifier : Missclassification error rate : %s", mean(missclassificationRate))
+
+sprintf("GAM classifier : Null Classifier: %s", mean(nullClassificationRate))
+
+sprintf("GAM classifier AUC: %s", mean (aucs))
+# FP rate:
+sprintf("GAM classifier : FP rate (TypeI error, 1 - specificity) : %s", mean(FP_rates))
+
+# TP rate:
+sprintf("GAM classifier : TP rate (1-TypeII error, power, sensetivity, recall) : %s", mean(TP_rates))
+
+# precision:
+sprintf("GAM classifier : precision: %s", mean(precisions))
+
+# specificity 1-FP/N:
+sprintf("GAM classifier : specificity 1-FP/N: %s", mean(specificities))
+
+
+```
+
+
+```{r loess with CV}
+locv1 <- function(x1, y1, nd, span, ntrial)
+{
+  locvgcv <- function(sp, x1, y1)
+  {
+    nd <- length(x1)
+
+    assign("data1", data.frame(xx1 = x1, yy1 = y1))
+    fit.lo <- loess(yy1 ~ xx1, data = data1, span = sp, family = "gaussian", degree = 2, surface = "direct")
+    res <- residuals(fit.lo)
+
+    dhat2 <- function(x1, sp)
+    {
+        nd2 <- length(x1)
+        diag1 <- diag(nd2)
+        dhat <- rep(0, length = nd2)
+
+        for(jj in 1:nd2){
+            y2 <- diag1[, jj]
+            assign("data1", data.frame(xx1 = x1, yy1 = y2))
+            fit.lo <- loess(yy1 ~ xx1, data = data1, span = sp, family = "gaussian", degree = 2, surface = "direct")
+            ey <- fitted.values(fit.lo)
+            dhat[jj] <- ey[jj]
+            }
+            return(dhat)
+        }
+
+        dhat <- dhat2(x1, sp)
+        trhat <- sum(dhat)
+        sse <- sum(res^2)
+
+        cv <- sum((res/(1 - dhat))^2)/nd
+        gcv <- sse/(nd * (1 - (trhat/nd))^2)
+
+        return(gcv)
+    }
+
+    gcv <- lapply(as.list(span1), locvgcv, x1 = x1, y1 = y1)
+    #cvgcv <- unlist(cvgcv)
+    #cv <- cvgcv[attr(cvgcv, "names") == "cv"]
+    #gcv <- cvgcv[attr(cvgcv, "names") == "gcv"]
+
+    return(gcv)
+}
+```
+
 
