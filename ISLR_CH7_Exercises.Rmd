@@ -6,7 +6,7 @@ output:
 ---
 
 ```{r apply lapply and sapply}
-
+library(tidyverse)
 # apply wors like reduce() (sum over columns (or rows) of a matrix or a tibble)
 (m1 <- matrix(C<-(1:10),nrow=5, ncol=6))
 (a_m1 <- apply(m1, 2, sum)) 
@@ -196,9 +196,9 @@ fit <- glm(I(wage > 250) ~ poly(age,4), data = wage.df, family = binomial)
 preds <- predict(fit, newdata=list(age=age.grid), se = T)
 
 # Note that predict function for glm model gets the prediction for logit i.e: 
-# log(Pr(Y=1 | X) / (1 - Pr(Y=1 | X))) = Xβ and also the standard error is 
+# log(Pr(Y=1 | X) / (1 - Pr(Y=1 | X))) = X*beta and also the standard error is 
 # of the same form, clealry to get prediction for Pr(Y=1|X) we need 
-# to calculate exp(Xβ)/(1+exp(Xβ))
+# to calculate exp(X*beta)/(1+exp(X*beta))
 
 prob.predict <- exp(preds$fit)/(1+exp(preds$fit))
 se.bound.logit <- cbind(preds$fit + 2*preds$se, preds$fit - 2*preds$se)
@@ -389,7 +389,7 @@ cv.gam <- gam(logwage~s(age, bs="cr") + s(year, bs="cr", k=5) + education,
               gamma=1.4)
 print("----------------- cv.gam model ---------------------")
 print(cv.gam)
-print("------ anova for approximate signifiocance of terms of cv.gam ---------")
+print("------ anova for approximate significance of terms of cv.gam ---------")
 anova(cv.gam)
 print("----------------- summary cv.gam1 ---------------------")
 summary(cv.gam)
@@ -506,6 +506,7 @@ ggplot(tibble(x=preds), aes(x = x)) +
         scale_y_continuous(name = "Probability")
 
 # calculate test.mse
+threshold = 0.5
 gam.pred <- ifelse(gam.probs > threshold, "Up", "Down")
 
 missclassificationRate = NULL

@@ -1,0 +1,50 @@
+---
+title: "sparklyr"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r }
+library(sparklyr)
+sc <- spark_connect(master = "local", version = "2.3")
+cars <- copy_to(sc, mtcars)
+
+```
+
+```{r}
+#cars
+#str(cars)
+#spark_web(sc)
+library(DBI)
+dbGetQuery(sc, "SELECT count(*) from mtcars")
+```
+
+```{r}
+library(tidyverse)
+# In general, we usually start by analyzing data in Spark with dplyr, 
+# followed by sampling rows and selecting a subset of the available columns. 
+# The last step is to collect data from Spark to perform further data processing 
+#in R, like data visualization.
+select (cars, hp, mpg) %>%
+  sample_n(100) %>%
+  collect() %>%
+  plot()
+
+model <- ml_linear_regression(cars, mpg ~ hp)
+model
+
+model %>%
+  ml_predict(copy_to(sc, data.frame(hp=250+10* 1: 10))) %>%
+  transmute(hp = hp, mpg = prediction) %>% 
+  full_join(select(cars, hp, mpg)) %>%
+  collect() %>%
+  plot()
+
+
+# distributing your own R code across the Spark cluster
+cars %>% spark_apply(~round(.x))
+
+spark_disconnect(sc)
+```
+
