@@ -1,0 +1,1247 @@
+---
+title: "Some handy tricks"
+output: html_notebook
+---
+
+```{r Some tidy stuff and factor stuff}
+library(tidyverse)
+wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+(wage.df.original = tibble(wage.df))
+(wage.df = tibble(wage.df))
+str(attributes(wage.df))
+str(wage.df)
+
+# convers maritl into an ordered factor
+# find levels in maritl column
+table(wage.df$maritl)[["1. Never Married"]]
+marit_levels <- names(table(wage.df$maritl))
+typeof(marit_levels)
+# now convert it to order factor
+
+# iris %>% select(starts_with(c("Petal", "Sepal")))
+
+# iris %>%
+#   group_by(Species) %>%
+#   summarise(across(starts_with("Sepal"), mean))
+
+# iris %>% summarise_at("Petal.Width", funs(min, anyNA))
+# starwars %>% mutate_if(is.numeric, scale2, na.rm = TRUE)
+
+wage.df %>%
+  mutate_at("maritl", ~factor(.x,levels=(.x %>% table() %>% dimnames())))
+
+turn.to.factor <- function(col, na.rm = FALSE) factor(col,levels=(col %>% table() %>% dimnames()))
+
+wage.df %>%
+  mutate_if(is.character, turn.to.factor, na.rm = TRUE)
+
+str(attributes(wage.df))
+attributes(wage.df)
+str(wage.df)
+
+str(attributes(matrix(1:6, c(2,3))))
+str(attributes(matrix(1:6, c(6,1))))
+m <- cbind(matrix(1:6, c(6,1)), c(1,1,1,2,2,1))
+
+
+```
+
+```{r Some basic stuff }
+# ------ table is used for counting records on one ore more factor columns -----
+(x <- table(mtcars[c("vs", "cyl", "am")]))
+
+# ---- for classification  use ordered factor to assign 1 to quality of interest --------# 
+x<-factor(c("a","b","b","a"))
+y<- ordered(c("a","b","b","a"), levels = c("c","b","a"))
+str(attributes(y))
+
+# -------------- modify levels of a factor ------- 
+
+x <- ordered(c("a", "b", "a", "b"), levels = c("a", "b", "c"))
+table(x)
+levels(x) <- rev(levels(x))
+table(x)
+
+```
+
+```{r atomic vector subsettings and factor subsettings}
+x <- c(2.1, 4.2, 5.3, 1.4)
+
+
+#----------------------------------------------
+# --- This is how R show an unnamed vector ---
+#----------------------------------------------
+# [1] 2.1 4.2 5.3 1.4
+
+names(x) <- c("one", "two", "three", "four")
+
+# --- This is how R show a named vector ---
+
+  # one   two three  four 
+  # 2.1   4.2   5.3   1.4 
+
+#----------------------------------------------
+# ------------ by position (index) ------------
+#----------------------------------------------
+x[c(3,1)]
+
+#  three   one 
+#   5.3   2.1 
+
+#--------------------------------------------------
+# ---- duplicate index means duplicate values -----
+#--------------------------------------------------
+x[c(3,3,2,4,2,3,1,4)]
+
+#  three three   two  four   two three   one  four 
+#   5.3   5.3   4.2   1.4   4.2   5.3   2.1   1.4 
+
+#-------------------------------------------------------------------------------
+# --- order() returns indices such that the corresponding elements are ordered--
+#-------------------------------------------------------------------------------
+x[order(x)]
+
+#   four   one   two three 
+#   1.4   2.1   4.2   5.3 
+
+#----------------------------------------------------------------
+# --- real numbers used as indices are truncated to integers ----
+#----------------------------------------------------------------
+x[c(3.1, 3.2, 3.3, 4.2)]
+
+#  three three three  four 
+#   5.3   5.3   5.3   1.4 
+
+#---------------------------------------------------------------
+# use negative elements to exclude values at specified position
+# --------------------------------------------------------------
+x[-2]
+
+#   one three  four 
+#   2.1   5.3   1.4 
+
+
+x[c(-3:-1)]
+
+# four 
+#  1.4 
+
+#----------------------------------------------------------------------
+# Logical vectors as index makes R chooses elements with TRUE as index
+#----------------------------------------------------------------------
+
+x[c(T,F,F,T)]
+
+ # one four 
+ # 2.1  1.4 
+ 
+
+x[x>3]
+
+  # two three 
+  # 4.2   5.3 
+
+#--------------------------------  
+# Only logical index is recycled 
+#--------------------------------
+x[T]
+
+#   one   two three  four 
+#   2.1   4.2   5.3   1.4 
+
+#--------------------------------
+# NA in index causes NA in output
+#--------------------------------
+x[c(2,3,NA,4)]
+
+#   two three  <NA>  four 
+#   4.2   5.3    NA   1.4 
+
+# ---------------------------------------------
+# Empty brackets [] will return original vector 
+# ---------------------------------------------
+x[]
+
+# one   two three  four 
+# 2.1   4.2   5.3   1.4 
+
+# --------------------------------
+# 0 will return zero length vector
+# --------------------------------
+x[0]
+
+# named numeric(0)
+
+
+# ----------------------------------------
+# out of bound index for vector returns NA
+# ----------------------------------------
+x[5]
+# <NA> 
+#   NA
+
+x["five"]
+# <NA> 
+#   NA
+
+
+# --------------------------------------------------
+#----------------- NA as index ---------------------
+# NA has logical type and logical vector is recycled 
+#---------------------------------------------------
+x[NA]
+
+# [1] NA NA NA NA
+
+# --------------------------------------------
+# named vectors can also be subset with names
+# --------------------------------------------
+
+x[c("one","three","one","four")]
+
+# one three   one  four
+# 2.1   5.3   2.1   1.4
+
+# -----------------------------------------------------------------------
+# factor subsetting is based on underlying integer vector not the levels
+# drop=T in operator [] controls if levels are dropped
+# -----------------------------------------------------------------------
+y <- ordered(c("a","b","b","a", "c"), levels = c("c","b","a"))
+y[c(1,2,3)] 
+
+# [1] a b b
+# Levels: c < b < a
+
+y[1]
+# [1] a
+# Levels: c < b < a
+
+y[1, drop=T]
+# [1] a
+# Levels: a
+
+```
+
+
+
+
+```{r list subsetting is similar to atomic vector}
+# ----------------------------------------------------------
+# ----------- How R shows a named list --------------------
+# ----------------------------------------------------------
+l <- list(a = 1, b=list(2,3,NULL), c=c(4,5,6) )
+
+# $a
+# [1] 1   (since everything is a vector, R shows values as single vector)
+# 
+# $b
+# $b[[1]]
+# [1] 2
+# 
+# $b[[2]]
+# [1] 3
+# 
+# $b[[3]]
+# NULL
+# 
+# $c
+# [1] 4 5 6
+
+
+
+# ----------------------------------------------------------
+# ----------- How R shows an unnamed list ------------------
+# ----------------------------------------------------------
+l <- list(1, list(2,3,NULL), c(4,5,6) )
+
+# [[1]]
+# [1] 1   (since everything is a vector, R shows values as single vector)
+# 
+# [[2]]
+# [[2]][[1]]
+# [1] 2
+# 
+# [[2]][[2]]
+# [1] 3
+# 
+# [[2]][[3]]
+# NULL
+# 
+# [[3]]
+# [1] 4 5 6
+
+# -----------------------------------------------------------------------------
+# ---- [] always returns a list, [[]] and $ returns elements in the list ----->
+# -----------------------------------------------------------------------------
+x <- list(a=list(1,2,3,4,5,6,7,8), b = c(9,10,11), d = 13)
+
+# -------------------------------
+# -------- by position ----------
+# -------------------------------
+x[3]    
+# $d
+# [1] 13
+
+x[[3]]
+# [1] 13
+
+x$d
+# [1] 13
+
+x[c(1,2)]
+# $a
+# $a[[1]]
+# [1] 1
+
+x[[c(1,8)]] # == x[[1]][[8]]
+# [1] 8
+
+x[[1]][[8]]
+# [1] 8
+
+x$a[[8]]
+# [1] 8
+
+
+x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+# --------------------------------------
+# duplicate index means duplicate values
+# --------------------------------------
+x[c(2,1,1)]
+
+# $b
+# [1]  9 10 11
+# 
+# $a
+# $a[[1]]
+# [1] 1
+# 
+# $a[[2]]
+# [1] 2
+# 
+# 
+# $a
+# $a[[1]]
+# [1] 1
+# 
+# $a[[2]]
+# [1] 2
+
+
+# ------------------------------------------------------------------------
+# order() not implemented for list
+# ------------------------------------------------------------------------
+
+
+x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+# ------------------------------------------------------
+# real numbers used as indices are truncated to integers
+# ------------------------------------------------------
+
+x[c(3.1, 1.2)]
+
+# $d
+# [1] 13
+# 
+# $a
+# $a[[1]]
+# [1] 1
+# 
+# $a[[2]]
+# [1] 2
+# 
+
+x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+# -------------------------------------------------------------
+# use negative elements to exclude values at specified position
+# -------------------------------------------------------------
+x[-2]
+
+# $a
+# $a[[1]]
+# [1] 1
+# 
+# $a[[2]]
+# [1] 2
+# 
+# 
+# $d
+# [1] 13
+
+x[c(-3:-1)]
+
+# named list()
+
+
+x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+# --------------------------------------------------------------------
+# Logical vectors as index makes R chooses elements with TRUE as index
+# --------------------------------------------------------------------
+
+x[c(T,F,F)]
+
+# $a
+# $a[[1]]
+# [1] 1
+# 
+# $a[[2]]
+# [1] 2
+
+
+
+# x[x>3] # # Error: 'list' object cannot be coerced to type 'double'
+
+
+x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+# ---------------------------------
+# # Only logical index is recycled
+# ---------------------------------
+x[T]
+
+# $a
+# $a[[1]]
+# [1] 1
+# 
+# $a[[2]]
+# [1] 2
+# 
+# 
+# $b
+# [1]  9 10 11
+# 
+# $d
+# [1] 13
+
+x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+# --------------------------------
+# NA in index causes NA in output
+# --------------------------------
+x[c(2,3,NA,4)]
+
+# $b
+# [1]  9 10 11
+# 
+# $d
+# [1] 13
+# 
+# $<NA>
+# NULL
+# 
+# $<NA>
+# NULL
+
+x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+# ---------------------------------------------
+# Empty brackets [] will return original list
+# ---------------------------------------------
+x[]
+# 
+# $a
+# $a[[1]]
+# [1] 1
+# 
+# $a[[2]]
+# [1] 2
+# 
+# 
+# $b
+# [1]  9 10 11
+# 
+# $d
+# [1] 13
+
+x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+# --------------------------------
+# 0 will return zero length list
+# --------------------------------
+x[0]
+
+# named list()
+
+
+x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+
+#----------------- NA as index ---------------------
+# NA has logical type and logical vector is recycled 
+#---------------------------------------------------
+x[NA]
+
+# $<NA>
+# NULL
+# 
+# $<NA>
+# NULL
+# 
+# $<NA>
+# NULL
+
+
+x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+# --------------------------------------
+# index out of bound for a list returns NULL
+# --------------------------------------
+x[4]
+
+# $<NA>
+# NULL
+
+# x[[4]] : Error: subscript out of bounds
+
+x$e
+# NULL
+
+
+x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+# --------------------------------------------
+# named vectors can also be subset with names
+# --------------------------------------------
+x[c("a","b","d")]
+
+# $a
+# $a[[1]]
+# [1] 1
+# 
+# $a[[2]]
+# [1] 2
+# 
+# 
+# $b
+# [1]  9 10 11
+# 
+# $d
+# [1] 13
+
+# --------------------------------------
+# We can construct a factor from a list
+# --------------------------------------
+y <- ordered(list("a","b","b","a", "c"), levels = c("c","b","a"))
+y[c(1,2,3)] 
+
+# [1] a b b
+# Levels: c < b < a
+
+
+l <- list(x=list(1,2,3,4), y = list(5,6,7,8), z = list(9,10,11,12))
+# --------------------------------------
+# get first element of each inner list
+# --------------------------------------
+
+lapply(l, function(inner.list) inner.list[[1]])
+
+# $x
+# [1] 1
+# 
+# $y
+# [1] 5
+# 
+# $z
+# [1] 9
+
+
+
+library(tidyverse)
+map(l, 1)
+
+# $x
+# [1] 1
+# 
+# $y
+# [1] 5
+# 
+# $z
+# [1] 9
+
+
+# ---------------------------------------------------------------------------
+# ------ note unlist strips off attributes of the object inside the list ----
+# ---------------------------------------------------------------------------
+l <- list(as.Date("1980-01-02"))
+unlist(l)
+
+(l1 <- rerun(2, sample(4)))
+typeof(l1)
+flatten_int(l1)
+
+
+
+```
+
+```{r matrices subsetting}
+# A matrix is just an atomic vector with three attributes:
+# dimnames, row names and column names
+# Thus we use a vector of values to fill a matrix up column by column 
+# or row by row
+
+a <- matrix(1:9, nrow = 3, byrow = F)
+
+#      [,1] [,2] [,3]
+# [1,]    1    4    7
+# [2,]    2    5    8
+# [3,]    3    6    9
+
+colnames(a) <- c("A", "B", "C")
+
+#      A B C
+# [1,] 1 4 7
+# [2,] 2 5 8
+# [3,] 3 6 9
+
+
+str(a)
+
+# int [1:3, 1:3] 1 2 3 4 5 6 7 8 9
+# - attr(*, "dimnames")=List of 2
+#  ..$ : NULL
+#  ..$ : chr [1:3] "A" "B" "C"
+
+
+# --------------------------------------------------------------
+# subsetting by supplying a vector of indices for each dimension
+# --------------------------------------------------------------
+
+a[0, -2]  # remember 0 as index returns an empty vector or list
+
+#    A C
+
+
+a[1:2,]
+
+#      A B C
+# [1,] 1 4 7
+# [2,] 2 5 8
+
+
+a[c(T,T,F), c("A", "C")]
+
+#      A C
+# [1,] 1 7
+# [2,] 2 8
+
+
+# ------------------------ Dimension Dropping -----------------------
+# '[]' simplifies result to loweset possible dimensionality unless we set drop=F
+#   matrix[row #i, ] retuns row #i as a vector
+#   matrix[ ,col# j] retuns col #j as a vector
+# preserve dimensionality with setting drop=F as last argument of subsetting
+# ------------------------------------------------------------------
+a[2, ]
+# A B C 
+# 2 5 8 
+
+a[2, , drop=F]
+
+#      A B C
+# [1,] 2 5 8
+
+a[, 3]
+# [1] 7 8 9
+
+a[, 3, drop=F]
+
+#      C
+# [1,] 7
+# [2,] 8
+# [3,] 9
+
+
+a[1,1] 
+# A 
+# 1 
+
+a[1,1, drop=F]
+#      A
+# [1,] 1
+
+# ---------------- Subsetting a matrix with a single vector -------------------
+# A matrix is a vector so like vectors we can use vector of indices to subset it
+# ------ Index of the elements in the matrix always goes column by column -----
+# -----------------------------------------------------------------------------
+a <- matrix(1:4, nrow = 2, byrow = T)
+colnames(a) <- c("A", "B")
+
+#      A B
+# [1,] 1 2
+# [2,] 3 4
+     
+a[1] # => 1
+a[2] # => 3
+a[3] # => 2
+a[4] # => 4
+
+a[c(2,4)]
+# [1] 3 4
+
+a <- matrix(1:4, nrow = 2, byrow = F)
+colnames(a) <- c("A", "B")
+
+#      A B
+# [1,] 1 3
+# [2,] 2 4
+
+a[1] # => 1
+a[2] # => 2
+a[3] # => 3
+a[4] # => 4
+
+
+a[c(2,4)]
+# [1] 2 4
+
+# ------------ Subsetting with logical matrix ----------------------------
+# subsetting with logical matrix with exact same dimension as the original 
+# matrix makes all elements that correspond to TRUE to be selected
+# -----------------------------------------------------------------------
+a <- outer(1:5, 1:5, FUN="*")
+
+#      [,1] [,2] [,3] [,4] [,5]
+# [1,]    1    2    3    4    5
+# [2,]    2    4    6    8   10
+# [3,]    3    6    9   12   15
+# [4,]    4    8   12   16   20
+# [5,]    5   10   15   20   25
+
+selection.matrix <- upper.tri(a)
+
+#       [,1]  [,2]  [,3]  [,4]  [,5]
+# [1,] FALSE  TRUE  TRUE  TRUE  TRUE
+# [2,] FALSE FALSE  TRUE  TRUE  TRUE
+# [3,] FALSE FALSE FALSE  TRUE  TRUE
+# [4,] FALSE FALSE FALSE FALSE  TRUE
+# [5,] FALSE FALSE FALSE FALSE FALSE
+
+a[selection.matrix]
+
+
+# Another example of logical matrix
+a <- outer(1:5, 1:5, FUN="*")
+diagonal.selection <- matrix(rep(F, 25), c(5,5))
+(for (i in 1:5)
+  for (j in 1:5)
+    diagonal.selection[i,j] <- (i==j)
+)
+diagonal.selection
+a[diagonal.selection]
+
+# Note:
+# a$A Error in a$A : $ operator is invalid for atomic vectors
+
+```
+
+
+
+```{r dataframe subsettings}
+
+df <- data.frame(x = 1:3, y=3:1, z = letters[1:3])
+
+# ----------------- Dataframe: a list of lists perspective ---------------------
+# When subsetting with single index / vector of indices  it behaves like 
+# a list of columns (i.e list of lists)
+# List subsetting: [] and [[]]
+# note since dataframe is a list, single index [] returns a dataframe 
+# (i.e a list) and a single index [[]] returns a vector as expected
+# ------------------------------------------------------------------------------
+df[2]  # => dataframe containing second column 
+
+df[[1]]  # =>  second column as a vector
+
+# [1] 1 2 3
+
+df [c(1,3)] # dataframe containg first and third column
+
+df [[c(1,3)]] # third element in first column (see the list subsetting)
+
+df[c("x", "z")] # dataframe containg first and third column
+
+df [c(2,2,1)] # dataframe contatining two times column #2 (named as Y and Y.1)
+              # and column #1 
+
+# ----------------- Dataframe: a matrix perspective ---------------------
+# Matrix subsetting: Two sets of indices to subset a dataframe returns a dataframe 
+# Filter condition is always filter rows , thus it is only on first index
+# dataframe with single column returns only that column unless we use drop=F
+# -----------------------------------------------------------------------
+
+df[df$x == 2, ] # => dataframe containing a row(s) with value 2 in its x column 
+
+df[c(1,3), ] # dataframe containing row# 1 and row # 3
+
+df[c(2,2,1), ] # dataframe containing two times row #2 () and row # 1
+
+df [, c(2,2,1)] # dataframe contatining two times column #2 (named as Y and Y.1)
+              # and column #1 
+
+df[, 1] # remember from matrices that matrix[ ,col# j] retuns col #j as a vector
+# [1] 1 2 3
+
+df[, 1, drop=F] # dataframe with single column #1
+
+df[, "y"] # [1] 3 2 1 
+
+df[, "y", drop=F] # dataframe with single column "y"
+
+
+```
+
+
+```{r filter_if mutte_if}
+library(tidyverse)
+
+# ---------- Cool tidyverse stuff --------------# 
+(df <- tibble(x = c("  "," 1  3", "12", "14  ",NA,"  "," 1  3", "12", "14  ", NA), 
+              y = c(1,2,NA,4,5,1,2,NA,4,5)))
+
+# First remove NA and empty spaces only from character columns
+df %>%
+  filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+
+# Next remove leading and trailing spaces from all elements in character columns
+trim.f <- function(col, na.rm = F) { 
+  isNA <- !reduce(col, ~ (is.na(.x) & is.na(.y)))
+  if (na.rm && isNA) 
+    unlist(map(col, ~ (if (is.na(.x)) "" else .x) ),use.names = F) %>%
+      trimws(which = c("both")) # leading and trailing spaces
+  else trimws(col, which = c("both")) # leading and trailing spaces
+}
+
+(df %>%
+  mutate_if(is.character, trim.f, na.rm = T))
+
+
+# pull(col) has the same effect as $col on dataframe
+identical(df %>% pull(x), df$x)
+
+# Finally convert character columns to factor
+
+df %>%
+  filter_if(is.character, any_vars(!is.na(.) & trimws(.) != "")) %>%
+  mutate_if(is.character, trim.f, na.rm = T) %>%
+  mutate_if(is.character, ~ ordered(.x, levels = unlist(.x %>% table %>% dimnames)))
+
+
+
+# distinct values of certain columns
+df %>% distinct(x,y)
+
+
+# select only character columns
+# df %>%
+#   select_if(~is.character(.))
+#   filter (!is.na(x) & trimws(x) != "")
+
+# msleep %>% 
+#   select(name:order, sleep_total:sleep_rem) %>% 
+#   filter_if(is.character, any_vars(is.na(.)))
+
+# ------------------------
+```
+
+
+```{r map reduce and all the fun stuff }
+library(tidyverse)
+gapminder_orig <- 
+  read.csv(
+    "https://raw.githubusercontent.com/swcarpentry/r-novice-gapminder/gh-pages/_episodes_rmd/data/gapminder-FiveYearData.csv")
+
+gapminder <-gapminder_orig
+# get dataframe schema
+gapminder %>%
+  map_chr(class)
+
+# get number of distince elements in each column
+gapminder %>%
+  map_dbl(n_distinct)
+
+# get number of NA in each column
+gapminder %>%
+  map_dbl(~ sum(is.na(.)))
+
+# get a summary of each column as a dataframe
+gapminder %>%
+  map_df(~ tibble(type=class(.),
+                  no.of.elements = n_distinct(.), 
+                  nas = sum(is.na(.))),
+         .id="variable")
+
+gapminder %>% sample_n(5) %>% pluck(1) # get the first column of dataframe
+
+# map2 help us with zip 
+map2(1:5, 1:5, ~ c(.x, .y))
+
+plot_it <- function(df) {
+  distincts.pairs <- df %>% distinct(continent, year)
+  map2(distincts.pairs %>% pull(continent) %>% as.character,
+       distincts.pairs %>% pull(year) ,
+       ~ df %>% 
+            filter(continent == .x, year == .y) %>%
+            ggplot() +
+            geom_point(aes(x = gdpPercap, y = lifeExp)) +
+            ggtitle(glue::glue(.x, " ", .y)))
+}
+
+gapminder %>% plot_it
+
+# To apply mutate functions to a list-column (i.e. a tibble column)
+# you need to wrap the function you want to apply in a map function.
+
+df_nested %>%
+  mutate(dimensions = glue::glue(map_int(data,nrow), " X ", map_int(data,ncol)))
+
+# another example, calculate average life expentency in each continit
+df_nested %>%
+  mutate(life_expect = map_dbl(data, ~ mean(.$lifeExp)))
+
+```
+
+
+
+
+```{r nested tibbles (analogous to window functions)}
+library(tidyverse)
+is_tibble(gapminder)
+
+df_nested <- gapminder %>%
+  group_by(continent) %>%
+  nest()
+
+is_tibble(df_nested$data[1])
+
+str(df_nested$data[1])
+
+# get the nested tibble easily
+df_nested %>%
+  pluck("data", 5)
+
+
+# fit a separate linear regression model to each continent
+
+df_models <- df_nested %>%
+  mutate(lm_model = map(data, ~ lm(lifeExp ~ pop + gdpPercap + year, data=.)))
+
+df_models %>%
+  pluck("lm_model", 1)
+
+# now predict on for each tibble (i.e each training data)
+
+df_predict <- df_models %>%
+  mutate(predict = map2(lm_model, data, ~ predict(.x, .y)))
+
+# caclulate corresponding MSEs
+
+df_predict %>%
+  mutate (mse = map2_dbl(predict, data, ~  mean((.x - .y$lifeExp)^2)))
+
+#fit a separate linear model for each continent without splitting up the data
+helper <- function(df, con){
+  model <- lm(lifeExp ~ pop + gdpPercap + year, data=df)
+  s <- summary(model)
+  print(s)
+  cbind(tibble(continent = con),
+        as_tibble(s$coefficients, rownames="term")) %>%
+    rename("Std.Error" = "Std. Error", "statistics" = "t value", "pValue" = "Pr(>|t|)")
+}
+
+nested <- gapminder %>% group_by(continent) %>% nest()
+  
+df_list <- map2(nested$data, nested$continent, ~helper(.x, .y))
+
+df_list %>% reduce(rbind)
+
+# a better solution
+gapminder %>% 
+  group_by(continent) %>% 
+  nest() %>%
+  mutate(lm_obj = map(data, ~lm(lifeExp ~ pop + year + gdpPercap, data = .))) %>%
+  mutate(lm_tidy = map(lm_obj, broom::tidy)) %>%
+  ungroup() %>% # on next line we use "continent" column that we grouped on
+  transmute(continent, lm_tidy) %>%
+  unnest(cols = c(lm_tidy)) # explode nested tibbles rows into containing df
+
+
+```
+```{r}
+
+
+```
+
+```{r map_df, split, keep, discard, stringr, head_while, tail_while, rerun}
+
+# map(element's index) extracts an element in the index from all nested lists
+
+list(ids = 1:3, values=c("one", "two", "three")) %>%
+  map(2)
+
+# read list of csv files with the same schema and merge them
+list.files("../open-data/", pattern = "^2017", full.names = TRUE) %>%
+  map_df(read_csv)
+
+# split simply group-by on given column and place them in separate tibbles
+gapminder_list <- gapminder %>% 
+  split(gapminder$continent)
+
+
+# Sample 5 records from each continent tibble
+samples <- gapminder %>% 
+  split(gapminder$continent) %>%
+  map(~(sample_n(., 5)))
+samples
+
+# keep those list elements (here datasets) that satisfy certain coditions
+samples %>%
+  keep(~(mean(.$lifeExp) > 70))
+
+# discard with some magical stringr 
+"absc61, sf22ve23,NA, wefc,wfverv,3rf3f344,rffr3$f446,,,rf11,NA,345fv,f3rf3" %>%
+  str_split(",") %>% # list containing one vector that contains splitted strings
+  pluck(1) %>% #get the first list in outer list
+  map_chr(str_trim) %>% # remove white spaces
+  discard(~ .=="" | .=="NA") %>% # discard empty strings or "NA"
+  keep(~ str_extract(., ".$") %in% 0:9) %>% # keep those ends with a digit
+  discard(~ as.numeric(str_extract(.x, "[:digit:]+$")) < 5)
+
+# head_while and tail_while
+sample(1:100) %>%
+  head_while(~ . < 10)
+
+sample(1:100) %>%
+  tail_while(~ . > 20)
+
+# run a function for a number of times
+(m <- rerun(10, rnorm(10)) %>% # provides a list of 10 vectors each containing 10 iid
+  reduce(cbind)) 
+colnames(m) <- 1:10 %>% map_chr (~ str_c("col", .))
+as_tibble(m)
+
+# imap is indexed map
+rerun(.n = 10, rnorm(10)) %>%
+  imap_dfr(~ tibble(run = .y, 
+                    mean = mean(.x),
+                    sd = sd(.x),
+                    median = median(.x)))
+
+
+```
+
+
+```{r reduce, accumulate, merge}
+library(tidyverse)
+# reduce /  reduce_right is R's foldleft / foldRight
+
+# -----------  foldLeft(List[Int]())((acc, x) => acc :+ (x + 1)) -----------
+# Note #1: The First argument of the function is always zero of monoid.
+# you can set zero of monoid using ".init" argument of reduce.
+# If .init is not provided then first element of the list is used as zero.
+# Note '.init = NULL' forces reduce to use NULL (i.e. an empty list) as 
+# zero of the monoid and pass it as the first argument to the provided function 
+# rather than using .x[[1]]. 
+# reduce passes elements of the collection as function's second argument.
+
+list(1,2,3,4,5) %>%
+  reduce(~append (.x, .y + 1), .init = NULL)
+
+list(1,2,3,4,5) %>%
+  reduce_right (~append (.x, .y + 1), .init = NULL)
+
+# reduce to find intersection between multiple lists
+
+
+
+# use reduce to append multiple data frames 
+df1 <- data.frame(Customer_ID = c(1, 2, 3), Name = c("John", "Sue", "Ann"))
+df2 <- data.frame(Customer_ID = c(4, 5, 6), Name = c("Joe", "Suzy", "Annable"))
+
+list(df1, df2) %>%
+  reduce(rbind)
+
+# accumulate does exactly the same thing as reduce but it also returns 
+# accumulated value on each loop, provided .init is accessible by index
+list(df1, df2) %>%
+  accumulate(rbind)
+
+
+# ----------- merge (join, left join, right join and ntural join) ----------
+# First remember what "all" option of "merge" does:
+# all = FALSE (default value) inner join where columns with the same name of 
+#                             associated tables will appear once only.
+# all.x = TRUE gives a left (outer) join, 
+# all.y = TRUE a right (outer) join, 
+# (all = TRUE) a (full) outer join. 
+# DBMSes do not match NULL records, equivalent to incomparables = NA in R.
+
+#  More data for merge 
+df1 <- data.frame(Customer_ID = c(1, 2, 3), Name = c("John", "Sue", "Ann"))
+df2 <- data.frame(Customer_ID = c(1, 3), Year_First_Order = c(2011, 2017))
+df3 <- data.frame(Customer_ID = c(1, 2, 3), 
+                  Date_Last_Order = c("2017-03-03", "2014-03-01", "2017-05-30"),
+                  No_Items_Last_Order = c(3, 1, 1),
+                  Total_Amount_Last_Order = c(49, 25,25))
+df4 <- data.frame(Customer_ID = c(2, 3), Interested_In_Promo = c(TRUE, FALSE))
+
+merge(df1 , df2, by="Customer_ID")
+merge(df1 , df2, by="Customer_ID", all.x = T)
+
+# now we use reduce to join the dataframes
+list(df1,df2,df3,df4) %>%
+  reduce(~ merge(.x, .y, all.x = T))
+
+
+# another example of reduce : Sums of matrix powers
+# we need package expm to do matrix power
+library(expm)
+(m <- rbind(c(0.9, 0.1), c(1, 0)))
+1:20 %>% 
+  map(~ (m %^% .)) %>% 
+  reduce(~(.x+.y), .init = rbind(c(0,0),c(0.0)))
+
+
+```
+
+
+
+
+```{r}
+
+## A general-purpose adder:
+add <- function(x) Reduce("+", x)
+add(list(1, 2, 3))
+## Like sum(), but can also used for adding matrices etc., as it will
+## use the appropriate '+' method in each reduction step.
+## More generally, many generics meant to work on arbitrarily many
+## arguments can be defined via reduction:
+FOO <- function(...) Reduce(FOO2, list(...))
+FOO2 <- function(x, y) UseMethod("FOO2")
+## FOO() methods can then be provided via FOO2() methods.
+
+## A general-purpose cumulative adder:
+cadd <- function(x) Reduce("+", x, accumulate = TRUE)
+cadd(seq_len(7))
+
+## A simple function to compute continued fractions:
+cfrac <- function(x) Reduce(function(u, v) u + 1 / v, x, right = TRUE)
+## Continued fraction approximation for pi:
+cfrac(c(3, 7, 15, 1, 292))
+## Continued fraction approximation for Euler's number (e):
+cfrac(c(2, 1, 2, 1, 1, 4, 1, 1, 6, 1, 1, 8))
+
+## Iterative function application:
+Funcall <- function(f, ...) f(...)
+## Compute log(exp(acos(cos(0))))
+Reduce(Funcall, list(log, exp, acos, cos), 0, right = TRUE)
+## n-fold iterate of a function, functional style:
+Iterate <- function(f, n = 1)
+    function(x) Reduce(Funcall, rep.int(list(f), n), x, right = TRUE)
+## Continued fraction approximation to the golden ratio:
+Iterate(function(x) 1 + 1 / x, 30)(1)
+## which is the same as
+cfrac(rep.int(1, 31))
+## Computing square root approximations for x as fixed points of the
+## function t |-> (t + x / t) / 2, as a function of the initial value:
+asqrt <- function(x, n) Iterate(function(t) (t + x / t) / 2, n)
+asqrt(2, 30)(10) # Starting from a positive value => +sqrt(2)
+asqrt(2, 30)(-1) # Starting from a negative value => -sqrt(2)
+
+## A list of all functions in the base environment:
+funs <- Filter(is.function, sapply(ls(baseenv()), get, baseenv()))
+## Functions in base with more than 10 arguments:
+names(Filter(function(f) length(formals(f)) > 10, funs))
+## Number of functions in base with a '...' argument:
+length(Filter(function(f)
+              any(names(formals(f)) %in% "..."),
+              funs))
+
+## Find all objects in the base environment which are *not* functions:
+Filter(Negate(is.function),  sapply(ls(baseenv()), get, baseenv()))
+
+```
+
+```{r raandom walk simulation}
+library(tidyverse)
+
+rerun(5, rnorm(100)) %>%
+  set_names(paste0("sim", 1:5)) %>%
+  map(~ accumulate(., ~ .05 + .x + .y)) %>%
+  map_dfr(~ tibble(value = .x, step = 1:100), .id = "simulation") %>%
+  ggplot(aes(x = step, y = value)) +
+    geom_line(aes(color = simulation)) +
+    ggtitle("Simulations of a random walk with drift")
+
+```
+```{r Vectorize}
+# We use rep.int as rep is primitive
+rep.int(12,5)
+vrep <- Vectorize(rep.int)
+vrep(1:4, 4:1)
+vrep(times = 1:4, x = 4:1)
+
+vrep <- Vectorize(rep.int, "times")
+vrep(times = 1:4, x = 42)
+
+f <- function(x = 1:3, y) c(x, y)
+vf <- Vectorize(f, SIMPLIFY = FALSE)
+f(1:3, 1:3)
+vf(1:3, 1:3)
+vf(y = 1:3) # Only vectorizes y, not x
+
+# Nonlinear regression contour plot, based on nls() example
+require(graphics)
+SS <- function(Vm, K, resp, conc) {
+    pred <- (Vm * conc)/(K + conc)
+    sum((resp - pred)^2 / pred)
+}
+vSS <- Vectorize(SS, c("Vm", "K"))
+Treated <- subset(Puromycin, state == "treated")
+
+Vm <- seq(140, 310, length.out = 50)
+K <- seq(0, 0.15, length.out = 40)
+SSvals <- outer(Vm, K, vSS, Treated$rate, Treated$conc)
+contour(Vm, K, SSvals, levels = (1:10)^2, xlab = "Vm", ylab = "K")
+
+# combn() has an argument named FUN
+combnV <- Vectorize(function(x, m, FUNV = NULL) combn(x, m, FUN = FUNV),
+                    vectorize.args = c("x", "m"))
+combnV(4, 1:4)
+combnV(4, 1:4, sum)
+```
+
+```{r some preprocessing}
+library(tidyverse)
+
+wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+wage.df.original = tibble(wage.df)
+(wage.df = tibble(wage.df))
+
+# remove empty characters and NA helper
+remove.empty.characters <- function(df) 
+  df %>%
+    select_all %>%
+    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+
+# Next remove leading and trailing spaces from all elements in character columns
+trim.f <- function(col, na.rm = F) { 
+  isNA <- !reduce(col, ~ (is.na(.x) & is.na(.y)))
+  if (na.rm && isNA) 
+    unlist(map(col, ~ (if (is.na(.x)) "" else .x) ),use.names = F)
+  else trimws(col, which = c("both")) # leading and trailing spaces
+}
+
+trim.spaces <- function(df)
+  (df %>%
+    mutate_if(is.character, trim.f, na.rm = T))
+
+# Finally convert character columns to factor
+
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+
+(wage.df <- 
+  wage.df %>%
+  na.omit() %>%
+  trim.spaces() %>%
+  remove.empty.characters() %>%
+  char.to.fctor())
+
+
+```

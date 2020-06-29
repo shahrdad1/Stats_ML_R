@@ -48,9 +48,12 @@ identical(dt_s, dt_l)
 #As a prior work, we can compute the median of the length for each species. 
 # tapply() is a quick way to perform this computation.
 
+tapply(matrix(1:6, c(6,1)), c(1,1,1,2,2,1),sum)
+
 data(iris)
 tapply(iris$Sepal.Width, iris$Species, median)
 
+str(iris$Sepal.Width)
 
 # remove any row that has at least one empty string value 
 (df1 <- tibble(x=c("" , " ", "  abc  " ,"", "  de","f  "), 
@@ -567,6 +570,10 @@ sprintf("GAM classifier : specificity 1-FP/N: %s", mean(specificities))
 
 
 ```{r loess with CV}
+library(tidyverse)
+library(mgcv)
+library(purrr)
+
 locv1 <- function(x1, y1, nd, span, ntrial)
 {
   locvgcv <- function(sp, x1, y1)
@@ -610,6 +617,78 @@ locv1 <- function(x1, y1, nd, span, ntrial)
 
     return(gcv)
 }
+```
+
+```{r Exercise 6}
+library(tidyverse)
+library(mgcv)
+
+
+wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+(wage.df.original = tibble(wage.df))
+(wage.df = tibble(wage.df))
+
+# remove empty characters and NA helper
+remove.empty.characters <- function(df) 
+  df %>%
+    select_all %>%
+    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+
+# Next remove leading and trailing spaces from all elements in character columns
+trim.f <- function(col, na.rm = F) { 
+  isNA <- !reduce(col, ~ (is.na(.x) & is.na(.y)))
+  if (na.rm && isNA) 
+    unlist(map(col, ~ (if (is.na(.x)) "" else .x) ),use.names = F)
+  else trimws(col, which = c("both")) # leading and trailing spaces
+}
+
+trim.spaces <- function(df)
+  (df %>%
+    mutate_if(is.character, trim.f, na.rm = T))
+
+# Finally convert character columns to factor
+
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+
+(wage.df <- 
+  wage.df %>%
+  na.omit() %>%
+  trim.spaces() %>%
+  remove.empty.characters() %>%
+  char.to.fctor())
+  
+
+# Polynomial regression to predict wage using age and find the degree with cv
+set.seed(1)
+k <- 10
+degrees <- 1:10
+
+# create k folds
+folds <- sample(1:k, nrow(wage.df), replace = T)
+table(folds)
+cv.result <- tibble(degree=NULL, cv.mse = NULL)
+
+for (degree in degrees){
+  
+  for (fold in folds){
+    fit.poly <- lm(wage ~ poly(age, degree), data = wage.df[folds != fold, ])
+    predicts <- predict(fit.poly, 
+                        newdata = list(age=wage.df[folds == fold, ]$age), se=T)
+    testMSE <- mean((predicts$fit - wage.df[folds == fold, ]$wage)^2)
+    
+  }
+  cv.result<- rbind(cv.result, degree = degree, )
+
+}
+
+
+
+
+
 ```
 
 
