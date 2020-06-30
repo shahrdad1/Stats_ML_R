@@ -1,16 +1,20 @@
 ---
-title: "Some handy tricks"
-output: html_notebook
+title: "Tricks in R"
+output: 
+  pdf_document: default
+  html_notebook: default
 ---
 
+# Some clean up work using tidyverse
 ```{r Some tidy stuff and factor stuff}
+suppressWarnings(suppressMessages(library(tidyverse)))
 library(tidyverse)
+
 wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", 
                       header=T, stringsAsFactors = F, na.strings = "?")
-(wage.df.original = tibble(wage.df))
-(wage.df = tibble(wage.df))
-str(attributes(wage.df))
-str(wage.df)
+wage.df.original = tibble(wage.df)
+wage.df = tibble(wage.df)
+
 
 # convers maritl into an ordered factor
 # find levels in maritl column
@@ -36,18 +40,11 @@ turn.to.factor <- function(col, na.rm = FALSE) factor(col,levels=(col %>% table(
 wage.df %>%
   mutate_if(is.character, turn.to.factor, na.rm = TRUE)
 
-str(attributes(wage.df))
-attributes(wage.df)
-str(wage.df)
-
-str(attributes(matrix(1:6, c(2,3))))
-str(attributes(matrix(1:6, c(6,1))))
-m <- cbind(matrix(1:6, c(6,1)), c(1,1,1,2,2,1))
-
-
 ```
 
-```{r Some basic stuff }
+
+# table and factor 
+```{r table and factor}
 # ------ table is used for counting records on one ore more factor columns -----
 (x <- table(mtcars[c("vs", "cyl", "am")]))
 
@@ -65,268 +62,288 @@ table(x)
 
 ```
 
+# Modify in place
+
+* Modifying an R object usually creates a new copy. 
+  + Use base::tracemem(x) to see if the object is copied
+  
+```{r}
+#--------------------------------------------------------------------
+# object with a single binding (object has a single name bound to it)
+#--------------------------------------------------------------------
+
+(v <- c(1,1,1))
+
+# use base::tracemem(x) to see if the object is copied
+cat(tracemem(v), "\n") # start tracing reference to v
+
+v[[3]] <- 4
+v
+
+untracemem(v) # stop tracing reference to v
+```
+
+
+
+# Atomic Vector Subsettings and Factor Subsettings 
+* Key Pints: 
+  + avoid using: *is.atomic()*, *is.numeric()* and *is.vector()*, use *is.null(dim())*
+  + applying *typeof()* to a vector returns type of its elements 
+  + use *[ ]* to retrieve multiple values from a vector
+    - using *[ [ ] ]* to get multiple values from a vector causes Error
+  + recomanded to use *[ [ ] ]* to retrieve a single element from a vector
+    - *[ [ ] ]* with zero length, NULL and out of bound index or name return error:
+      + vector[ [NULL] ]       ==> Error
+      + vector[ [integer(0)] ] ==> Error
+      + vector[ [out_of_bound_integer ] ]   ==> Error
+      + vector[ [out_of_bound_character ] ] ==> Error
+
+    - *[ ]* with zero length, NULL and out of bound index or name return empty vector
+    
+  + only logical vector is recycled when used for subsetting  
+  + *NA* has logical type thus when used for subsetting it will be recycled
+  + coercion used by *c()* is: *logical* => *integer* => *double* => *character*
+  + avoid automatic coercion inside *c()*, always do explicit coercion within *c()*
+  + To create an empty vector of certain "type" and certain "length" 
+    - vector("type", length = n) as: *vector("complex", length = 0)*
+    - type(n) as: *numeric(3)*
+    - type() is shorthand for type(0) as: *numeric()*
 ```{r atomic vector subsettings and factor subsettings}
-x <- c(2.1, 4.2, 5.3, 1.4)
-
-
 #----------------------------------------------
 # --- This is how R show an unnamed vector ---
 #----------------------------------------------
-# [1] 2.1 4.2 5.3 1.4
+
+(x <- c(2.1, 4.2, 5.3, 1.4))
 
 names(x) <- c("one", "two", "three", "four")
 
+#----------------------------------------------
 # --- This is how R show a named vector ---
+#----------------------------------------------
 
-  # one   two three  four 
-  # 2.1   4.2   5.3   1.4 
+x
+
+typeof(x)
 
 #----------------------------------------------
-# ------------ by position (index) ------------
+# -------- subsetting by position (index) -----
 #----------------------------------------------
 x[c(3,1)]
-
-#  three   one 
-#   5.3   2.1 
+# x[[c(3,1)]]  error: attempt to select more than one element vectorIndex
 
 #--------------------------------------------------
 # ---- duplicate index means duplicate values -----
 #--------------------------------------------------
 x[c(3,3,2,4,2,3,1,4)]
-
-#  three three   two  four   two three   one  four 
-#   5.3   5.3   4.2   1.4   4.2   5.3   2.1   1.4 
-
+# x[[c(3,3,2,4,2,3,1,4)]] error: attempt to select more than one element vectorIndex
 #-------------------------------------------------------------------------------
 # --- order() returns indices such that the corresponding elements are ordered--
 #-------------------------------------------------------------------------------
 x[order(x)]
-
-#   four   one   two three 
-#   1.4   2.1   4.2   5.3 
-
+# x[[order(x)]] error: attempt to select more than one element vectorIndex
 #----------------------------------------------------------------
 # --- real numbers used as indices are truncated to integers ----
 #----------------------------------------------------------------
 x[c(3.1, 3.2, 3.3, 4.2)]
-
-#  three three three  four 
-#   5.3   5.3   5.3   1.4 
-
+# x[[c(3.1, 3.2, 3.3, 4.2)]] error: attempt to select more than one element vectorIndex
 #---------------------------------------------------------------
 # use negative elements to exclude values at specified position
 # --------------------------------------------------------------
 x[-2]
-
-#   one three  four 
-#   2.1   5.3   1.4 
-
+# x[[-2]] error: attempt to select more than one element vectorIndex
 
 x[c(-3:-1)]
-
-# four 
-#  1.4 
-
+# x[[c(-3:-1)]] error: attempt to select more than one element vectorIndex
 #----------------------------------------------------------------------
 # Logical vectors as index makes R chooses elements with TRUE as index
 #----------------------------------------------------------------------
 
 x[c(T,F,F,T)]
-
- # one four 
- # 2.1  1.4 
- 
+# x[[c(T,F,F,T)]] error: attempt to select more than one element vectorIndex
 
 x[x>3]
-
-  # two three 
-  # 4.2   5.3 
-
+# x[[x>3]] error: attempt to select more than one element vectorIndex
 #--------------------------------  
 # Only logical index is recycled 
 #--------------------------------
 x[T]
-
-#   one   two three  four 
-#   2.1   4.2   5.3   1.4 
-
+x[[T]] # recomended
 #--------------------------------
 # NA in index causes NA in output
 #--------------------------------
 x[c(2,3,NA,4)]
-
-#   two three  <NA>  four 
-#   4.2   5.3    NA   1.4 
-
+# x[[c(2,3,NA,4)]] error: attempt to select more than one element vectorIndex
 # ---------------------------------------------
 # Empty brackets [] will return original vector 
 # ---------------------------------------------
 x[]
-
-# one   two three  four 
-# 2.1   4.2   5.3   1.4 
-
+# x[[]] error: subscript out of bound
 # --------------------------------
 # 0 will return zero length vector
 # --------------------------------
 x[0]
-
-# named numeric(0)
-
-
-# ----------------------------------------
-# out of bound index for vector returns NA
-# ----------------------------------------
-x[5]
-# <NA> 
-#   NA
-
-x["five"]
-# <NA> 
-#   NA
+# x[[0]] error: attempt to select more than one element vectorIndex
 
 
-# --------------------------------------------------
+#------------ Create an empty vector of given length ------------------
+# vector("type", length = <<length>>) 
+# <<type>>(<<length>>) like numeric(3)
+# ---------------------------------------------------------------------
+
+identical(numeric(0) , vector("double" , length = 0))
+identical(logical(2) , vector("logical", length = 2))
+identical(integer(0) , vector("integer", length = 0))
+identical(complex(0) , vector("complex", length = 0))
+identical(character(4) , vector("character", length = 4))
+
+
+# ------------------------------------------------------------------
+# [[]] with zero length, NULL and out of bound index or name return error
+# ------------------------------------------------------------------
+x[NULL] 
+
+# x[[NULL]]  error: attempt to select less than one element in get1index
+
+x[logical()]
+
+# x[[logical()]] error: attempt to select less than one element in get1index
+
+x[1000]
+# x[[1000]] error: subscript out of bound
+
+x["out_of_bound"]
+# x[["out of bound"]] error: subscript out of bound
+
 #----------------- NA as index ---------------------
 # NA has logical type and logical vector is recycled 
 #---------------------------------------------------
 x[NA]
-
-# [1] NA NA NA NA
-
+# x[[NA]] error: subscript out of bound
 # --------------------------------------------
 # named vectors can also be subset with names
 # --------------------------------------------
-
 x[c("one","three","one","four")]
-
-# one three   one  four
-# 2.1   5.3   2.1   1.4
-
+# x[[c("one","three","one","four")]] # error: attempt to select more than one element vectorIndex
 # -----------------------------------------------------------------------
 # factor subsetting is based on underlying integer vector not the levels
 # drop=T in operator [] controls if levels are dropped
 # -----------------------------------------------------------------------
 y <- ordered(c("a","b","b","a", "c"), levels = c("c","b","a"))
 y[c(1,2,3)] 
+# y[[c(1,2,3)]] # error: attempt to select more than one element vectorIndex 
 
-# [1] a b b
-# Levels: c < b < a
 
 y[1]
-# [1] a
-# Levels: c < b < a
+y[[1]] # recomended
 
 y[1, drop=T]
-# [1] a
-# Levels: a
+y[[1, drop=T]] # recomended
 
 ```
 
 
 
+# List Subsettings 
+* Key Pints: 
+  + *typeof()* applied on a list returns *list*
+  + *[ ]* operator always returns a list whereas *[ [ ] ]* operator returns a single object
+  + *$*col is a short form for *[ ["col"] ]* returns a single object bound to "col"
+  + *$*col is translated to *[ ["col"] ]* by R
+  + *[ [ ] ]* better be used with single positive integer or single string
+  
+  + Subsetting a non_empty list with *[ [ ] ]* returns:
+    - list[ [NULL] ]       ==> Error
+    - list[ [integer(0)] ] ==> Error
+    - list[ [out_of_bound_integer ] ]   ==> NULL
+    - list[ [out_of_bound_character ] ] ==> NULL
+
+  + NULL is an empty list
+
+  + Subsetting NULL always returns NULL 
+    - NULL[ [NULL] ]       ==> NULL
+    - NULL[ [integer(0)] ] ==> NULL
+    - NULL[ [out_of_bound integer ] ]   ==> NULL
+    - NULL[ [out_of_bound character ] ] ==> NULL
+
+    - NULL[NULL]       ==> NULL
+    - NULL[integer(0)] ==> NULL
+    - NULL[out_of_bound_integer ]   ==> NULL
+    - NULL[out_of_bound_character] ==> NULL
+
+  + *[ [c(1,2)] ]* is equivalent to *[ [1] ][ [2] ]* (use *purrr::pluck(x, 1, 2)* instead)
+  
+  + *$* operator does partial matching but *[ [ ] ]* operator performs full matching
+  + avoid silent partial matching by: options(warnPartialMatchDollar = T)
+  + To create an empty list: *list()*
+  + To create a list of length n full of NULL: *vector("list", length=n)*
+  + *NULL == list() == list()[0] == list()[1]*
+  + To convert a list to a vector use *unlist* (note *vector(list)* does not work!!)
+  + Note that *unlist* strip off attributes of the object in the list
+  + *list[NA]* returns *NA* 
 
 ```{r list subsetting is similar to atomic vector}
 # ----------------------------------------------------------
 # ----------- How R shows a named list --------------------
 # ----------------------------------------------------------
-l <- list(a = 1, b=list(2,3,NULL), c=c(4,5,6) )
-
-# $a
-# [1] 1   (since everything is a vector, R shows values as single vector)
-# 
-# $b
-# $b[[1]]
-# [1] 2
-# 
-# $b[[2]]
-# [1] 3
-# 
-# $b[[3]]
-# NULL
-# 
-# $c
-# [1] 4 5 6
-
+(x <- list(a = 1, b=list(2,3,NULL), c=c(4,5,6) ))
 
 
 # ----------------------------------------------------------
 # ----------- How R shows an unnamed list ------------------
 # ----------------------------------------------------------
-l <- list(1, list(2,3,NULL), c(4,5,6) )
+(x <- list(1, list(2,3,NULL), c(4,5,6) ))
 
-# [[1]]
-# [1] 1   (since everything is a vector, R shows values as single vector)
-# 
-# [[2]]
-# [[2]][[1]]
-# [1] 2
-# 
-# [[2]][[2]]
-# [1] 3
-# 
-# [[2]][[3]]
-# NULL
-# 
-# [[3]]
-# [1] 4 5 6
 
 # -----------------------------------------------------------------------------
 # ---- [] always returns a list, [[]] and $ returns elements in the list ----->
 # -----------------------------------------------------------------------------
-x <- list(a=list(1,2,3,4,5,6,7,8), b = c(9,10,11), d = 13)
+(x <- list(a=list(1,2,3,4,5,6,7,8), b = c(9,10,11), d = 13))
+
 
 # -------------------------------
 # -------- by position ----------
 # -------------------------------
 x[3]    
-# $d
-# [1] 13
+
 
 x[[3]]
-# [1] 13
+
 
 x$d
-# [1] 13
+
+feature.name <- "d"
+x$feature.name # this returns NULL because it translates to x[["feature.name"]] 
+
+x[[feature.name]]
 
 x[c(1,2)]
-# $a
-# $a[[1]]
-# [1] 1
 
 x[[c(1,8)]] # == x[[1]][[8]]
-# [1] 8
+
+purrr::pluck(x,1,8)
 
 x[[1]][[8]]
-# [1] 8
 
 x$a[[8]]
-# [1] 8
 
 
-x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+
+# ------------------------------------------------------------
+# $ does the partial matching but [["col"]] does full maching
+# to get a warning when R does partial matching always set 
+#          options(warnPartialMatchDollar = T)
+# ------------------------------------------------------------
+
+options(warnPartialMatchDollar = T)
+(x <- list(acd=list(1,2), adc=list(1,2), d = 13))
+x$ac
+
+
+(x <- list(a=list(1,2), b = c(9,10,11), d = 13))
 # --------------------------------------
 # duplicate index means duplicate values
 # --------------------------------------
 x[c(2,1,1)]
-
-# $b
-# [1]  9 10 11
-# 
-# $a
-# $a[[1]]
-# [1] 1
-# 
-# $a[[2]]
-# [1] 2
-# 
-# 
-# $a
-# $a[[1]]
-# [1] 1
-# 
-# $a[[2]]
-# [1] 2
 
 
 # ------------------------------------------------------------------------
@@ -334,229 +351,143 @@ x[c(2,1,1)]
 # ------------------------------------------------------------------------
 
 
-x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+(x <- list(a=list(1,2), b = c(9,10,11), d = 13))
 # ------------------------------------------------------
 # real numbers used as indices are truncated to integers
 # ------------------------------------------------------
 
 x[c(3.1, 1.2)]
 
-# $d
-# [1] 13
-# 
-# $a
-# $a[[1]]
-# [1] 1
-# 
-# $a[[2]]
-# [1] 2
-# 
-
-x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+(x <- list(a=list(1,2), b = c(9,10,11), d = 13))
 # -------------------------------------------------------------
 # use negative elements to exclude values at specified position
 # -------------------------------------------------------------
 x[-2]
 
-# $a
-# $a[[1]]
-# [1] 1
-# 
-# $a[[2]]
-# [1] 2
-# 
-# 
-# $d
-# [1] 13
-
 x[c(-3:-1)]
 
-# named list()
 
-
-x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+(x <- list(a=list(1,2), b = c(9,10,11), d = 13))
 # --------------------------------------------------------------------
 # Logical vectors as index makes R chooses elements with TRUE as index
 # --------------------------------------------------------------------
 
 x[c(T,F,F)]
 
-# $a
-# $a[[1]]
-# [1] 1
-# 
-# $a[[2]]
-# [1] 2
-
-
 
 # x[x>3] # # Error: 'list' object cannot be coerced to type 'double'
 
 
-x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+(x <- list(a=list(1,2), b = c(9,10,11), d = 13))
 # ---------------------------------
 # # Only logical index is recycled
 # ---------------------------------
 x[T]
 
-# $a
-# $a[[1]]
-# [1] 1
-# 
-# $a[[2]]
-# [1] 2
-# 
-# 
-# $b
-# [1]  9 10 11
-# 
-# $d
-# [1] 13
 
-x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+(x <- list(a=list(1,2), b = c(9,10,11), d = 13))
 # --------------------------------
 # NA in index causes NA in output
 # --------------------------------
 x[c(2,3,NA,4)]
 
-# $b
-# [1]  9 10 11
-# 
-# $d
-# [1] 13
-# 
-# $<NA>
-# NULL
-# 
-# $<NA>
-# NULL
-
-x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+(x <- list(a=list(1,2), b = c(9,10,11), d = 13))
 # ---------------------------------------------
 # Empty brackets [] will return original list
 # ---------------------------------------------
 x[]
-# 
-# $a
-# $a[[1]]
-# [1] 1
-# 
-# $a[[2]]
-# [1] 2
-# 
-# 
-# $b
-# [1]  9 10 11
-# 
-# $d
-# [1] 13
 
-x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+(x <- list(a=list(1,2), b = c(9,10,11), d = 13))
 # --------------------------------
 # 0 will return zero length list
 # --------------------------------
 x[0]
 
-# named list()
+
+(x <- list(a=list(1,2), b = c(9,10,11), d = 13))
 
 
-x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+# ----------------------------------------------------------------------------
+#  Subestting with NULL OOB (int), OOB (char) and NA
+# ----------------------------------------------------------------------------
+
+x[numeric()] 
+#  x[[numeric()]] Error : attempt to select less than one element in get1index
+
+x[NULL]
+#  x[[NULL]] Error : attempt to select less than one element in get1index
+
+x[1000]
+#x[[1000]] Error : subscript out of bounds
+
+x["out_of_bound"]
+x[["out_of_bound"]]
 
 #----------------- NA as index ---------------------
 # NA has logical type and logical vector is recycled 
 #---------------------------------------------------
 x[NA]
 
-# $<NA>
-# NULL
-# 
-# $<NA>
-# NULL
-# 
-# $<NA>
-# NULL
+x[[NA]]
+
+# ----------------------------------------------------------------------
+#  NULL is an empty list. Subsetting NULL with [[]] and [] always returns NULL
+# ----------------------------------------------------------------------
+NULL[[1]]
+NULL[[]]
+NULL[[numeric(0)]]
+NULL[[NULL]]
+NULL[["out_of_bound"]]
+NULL[[1000]]
+
+NULL[1]
+NULL[]
+NULL[numeric(0)]
+NULL[NULL]
+NULL["out_of_bound"]
+NULL[1000]
 
 
-x <- list(a=list(1,2), b = c(9,10,11), d = 13)
-# --------------------------------------
-# index out of bound for a list returns NULL
-# --------------------------------------
-x[4]
 
-# $<NA>
-# NULL
-
-# x[[4]] : Error: subscript out of bounds
-
-x$e
-# NULL
-
-
-x <- list(a=list(1,2), b = c(9,10,11), d = 13)
+(x <- list(a=list(1,2), b = c(9,10,11), d = 13))
 # --------------------------------------------
 # named vectors can also be subset with names
 # --------------------------------------------
 x[c("a","b","d")]
 
-# $a
-# $a[[1]]
-# [1] 1
-# 
-# $a[[2]]
-# [1] 2
-# 
-# 
-# $b
-# [1]  9 10 11
-# 
-# $d
-# [1] 13
-
 # --------------------------------------
 # We can construct a factor from a list
 # --------------------------------------
-y <- ordered(list("a","b","b","a", "c"), levels = c("c","b","a"))
+(y <- ordered(list("a","b","b","a", "c"), levels = c("c","b","a")))
 y[c(1,2,3)] 
 
-# [1] a b b
-# Levels: c < b < a
 
+# ---------------------------------------------------------------
+# purrr::pluck always returns NULL when OOB or empty index object
+# ---------------------------------------------------------------
+purrr::pluck(x, "a", 2)
+purrr::pluck(x, 2, 3)
+purrr::pluck(x, 3)
+purrr::pluck(x, 3, 1)
+purrr::pluck(x, "Out_of_Bound", 2)
+purrr::pluck(x, "b", 1000)
 
-l <- list(x=list(1,2,3,4), y = list(5,6,7,8), z = list(9,10,11,12))
+(l <- list(x=list(1,2,3,4), y = list(5,6,7,8), z = list(9,10,11,12)))
 # --------------------------------------
 # get first element of each inner list
 # --------------------------------------
 
 lapply(l, function(inner.list) inner.list[[1]])
 
-# $x
-# [1] 1
-# 
-# $y
-# [1] 5
-# 
-# $z
-# [1] 9
-
-
-
+suppressWarnings(suppressMessages(library(tidyverse)))
 library(tidyverse)
 map(l, 1)
-
-# $x
-# [1] 1
-# 
-# $y
-# [1] 5
-# 
-# $z
-# [1] 9
 
 
 # ---------------------------------------------------------------------------
 # ------ note unlist strips off attributes of the object inside the list ----
 # ---------------------------------------------------------------------------
-l <- list(as.Date("1980-01-02"))
+(l <- list(as.Date("1980-01-02")))
 unlist(l)
 
 (l1 <- rerun(2, sample(4)))
@@ -566,34 +497,37 @@ flatten_int(l1)
 
 
 ```
+# Matrix Subsettings 
+* Key Pints: 
+  + *matrix* is just an atomic vector with three attributes:
+    - dimensions
+    - row names
+    - column names
+  + Subset a *matrix* by supplying a vector of indices for each dimension:
+    - All rules for subsetting a vector is applied to subsetting each dimension
+  + vector of values is used to fill a *matrix* up column by column or row by row
+  + Dimension Dropping:
+    - *[ ]* simplifies result to loweset possible dimensionality unless we set *drop=F*
+    - *matrix[row #i, ]* retuns row #i as a vector
+    - *matrix[ ,col# j]* retuns col #j as a vector
+    - To preserve dimensionality set *drop=F* as last argument of operator *[ [ ] ]*
+  + Subsetting a *matrix* with a single vector  
+    - *matrix* is a vector so like vectors we can use vector of indices to subset it
+    - Index of the elements in the *matrix* always goes column by column
+  + Subsetting *matrix* with logical *matrix* which has same dimension as the original one
+    - R selects those elements that correspond to TRUE in logical matrix
+
 
 ```{r matrices subsetting}
-# A matrix is just an atomic vector with three attributes:
-# dimnames, row names and column names
-# Thus we use a vector of values to fill a matrix up column by column 
-# or row by row
 
-a <- matrix(1:9, nrow = 3, byrow = F)
 
-#      [,1] [,2] [,3]
-# [1,]    1    4    7
-# [2,]    2    5    8
-# [3,]    3    6    9
+(a <- matrix(1:9, nrow = 3, byrow = F))
+
+
 
 colnames(a) <- c("A", "B", "C")
 
-#      A B C
-# [1,] 1 4 7
-# [2,] 2 5 8
-# [3,] 3 6 9
-
-
 str(a)
-
-# int [1:3, 1:3] 1 2 3 4 5 6 7 8 9
-# - attr(*, "dimnames")=List of 2
-#  ..$ : NULL
-#  ..$ : chr [1:3] "A" "B" "C"
 
 
 # --------------------------------------------------------------
@@ -602,82 +536,44 @@ str(a)
 
 a[0, -2]  # remember 0 as index returns an empty vector or list
 
-#    A C
-
 
 a[1:2,]
-
-#      A B C
-# [1,] 1 4 7
-# [2,] 2 5 8
 
 
 a[c(T,T,F), c("A", "C")]
 
-#      A C
-# [1,] 1 7
-# [2,] 2 8
-
 
 # ------------------------ Dimension Dropping -----------------------
-# '[]' simplifies result to loweset possible dimensionality unless we set drop=F
-#   matrix[row #i, ] retuns row #i as a vector
-#   matrix[ ,col# j] retuns col #j as a vector
-# preserve dimensionality with setting drop=F as last argument of subsetting
-# ------------------------------------------------------------------
+
 a[2, ]
-# A B C 
-# 2 5 8 
 
 a[2, , drop=F]
 
-#      A B C
-# [1,] 2 5 8
 
 a[, 3]
-# [1] 7 8 9
 
 a[, 3, drop=F]
 
-#      C
-# [1,] 7
-# [2,] 8
-# [3,] 9
-
-
 a[1,1] 
-# A 
-# 1 
 
 a[1,1, drop=F]
-#      A
-# [1,] 1
 
 # ---------------- Subsetting a matrix with a single vector -------------------
-# A matrix is a vector so like vectors we can use vector of indices to subset it
-# ------ Index of the elements in the matrix always goes column by column -----
-# -----------------------------------------------------------------------------
-a <- matrix(1:4, nrow = 2, byrow = T)
+
+(a <- matrix(1:4, nrow = 2, byrow = T))
 colnames(a) <- c("A", "B")
 
-#      A B
-# [1,] 1 2
-# [2,] 3 4
-     
+
 a[1] # => 1
 a[2] # => 3
 a[3] # => 2
 a[4] # => 4
 
 a[c(2,4)]
-# [1] 3 4
 
-a <- matrix(1:4, nrow = 2, byrow = F)
+
+(a <- matrix(1:4, nrow = 2, byrow = F))
 colnames(a) <- c("A", "B")
-
-#      A B
-# [1,] 1 3
-# [2,] 2 4
 
 a[1] # => 1
 a[2] # => 2
@@ -686,29 +582,12 @@ a[4] # => 4
 
 
 a[c(2,4)]
-# [1] 2 4
+
 
 # ------------ Subsetting with logical matrix ----------------------------
-# subsetting with logical matrix with exact same dimension as the original 
-# matrix makes all elements that correspond to TRUE to be selected
-# -----------------------------------------------------------------------
-a <- outer(1:5, 1:5, FUN="*")
-
-#      [,1] [,2] [,3] [,4] [,5]
-# [1,]    1    2    3    4    5
-# [2,]    2    4    6    8   10
-# [3,]    3    6    9   12   15
-# [4,]    4    8   12   16   20
-# [5,]    5   10   15   20   25
+(a <- outer(1:5, 1:5, FUN="*"))
 
 selection.matrix <- upper.tri(a)
-
-#       [,1]  [,2]  [,3]  [,4]  [,5]
-# [1,] FALSE  TRUE  TRUE  TRUE  TRUE
-# [2,] FALSE FALSE  TRUE  TRUE  TRUE
-# [3,] FALSE FALSE FALSE  TRUE  TRUE
-# [4,] FALSE FALSE FALSE FALSE  TRUE
-# [5,] FALSE FALSE FALSE FALSE FALSE
 
 a[selection.matrix]
 
@@ -729,23 +608,26 @@ a[diagonal.selection]
 ```
 
 
-
+# Dataframe Subsettings as List of Lists and as Matrix
+* Key Pints: 
+  + Dataframe treated as a list of lists:
+    - When subsetting with a single index or vector of indices  it behaves like a list of columns (i.e list of lists)
+    - All rules for list subsetting using *[ ]* and *[ [ ] ]* are applied
+    - Single index *[ ]* returns a dataframe (i.e a list, remember list subsetting rules)
+    - Single index *[ [ ] ]* returns vector (i.e an object , remember list subsetting rules)
+  + Dataframe treated as a *matrix*
+    - Two sets of indices are used to subset a dataframe which returns a dataframe
+    - Filter condition is always filter rows ,it is only on first index
+    - dataframe with single column returns only that column unless we use drop=F (remember dimension dropping )
 ```{r dataframe subsettings}
 
 df <- data.frame(x = 1:3, y=3:1, z = letters[1:3])
 
 # ----------------- Dataframe: a list of lists perspective ---------------------
-# When subsetting with single index / vector of indices  it behaves like 
-# a list of columns (i.e list of lists)
-# List subsetting: [] and [[]]
-# note since dataframe is a list, single index [] returns a dataframe 
-# (i.e a list) and a single index [[]] returns a vector as expected
-# ------------------------------------------------------------------------------
+
 df[2]  # => dataframe containing second column 
 
 df[[1]]  # =>  second column as a vector
-
-# [1] 1 2 3
 
 df [c(1,3)] # dataframe containg first and third column
 
@@ -753,14 +635,9 @@ df [[c(1,3)]] # third element in first column (see the list subsetting)
 
 df[c("x", "z")] # dataframe containg first and third column
 
-df [c(2,2,1)] # dataframe contatining two times column #2 (named as Y and Y.1)
-              # and column #1 
+df [c(2,2,1)] # dataframe contatining two times column #2 (named as Y and Y.1) and column #1 
 
 # ----------------- Dataframe: a matrix perspective ---------------------
-# Matrix subsetting: Two sets of indices to subset a dataframe returns a dataframe 
-# Filter condition is always filter rows , thus it is only on first index
-# dataframe with single column returns only that column unless we use drop=F
-# -----------------------------------------------------------------------
 
 df[df$x == 2, ] # => dataframe containing a row(s) with value 2 in its x column 
 
@@ -768,15 +645,13 @@ df[c(1,3), ] # dataframe containing row# 1 and row # 3
 
 df[c(2,2,1), ] # dataframe containing two times row #2 () and row # 1
 
-df [, c(2,2,1)] # dataframe contatining two times column #2 (named as Y and Y.1)
-              # and column #1 
+df [, c(2,2,1)] # dataframe contatining two times column #2 (named as Y and Y.1) and column #1 
 
 df[, 1] # remember from matrices that matrix[ ,col# j] retuns col #j as a vector
-# [1] 1 2 3
 
 df[, 1, drop=F] # dataframe with single column #1
 
-df[, "y"] # [1] 3 2 1 
+df[, "y"] 
 
 df[, "y", drop=F] # dataframe with single column "y"
 
@@ -785,6 +660,7 @@ df[, "y", drop=F] # dataframe with single column "y"
 
 
 ```{r filter_if mutte_if}
+suppressWarnings(suppressMessages(library(tidyverse)))
 library(tidyverse)
 
 # ---------- Cool tidyverse stuff --------------# 
@@ -838,6 +714,7 @@ df %>% distinct(x,y)
 
 
 ```{r map reduce and all the fun stuff }
+suppressWarnings(suppressMessages(library(tidyverse)))
 library(tidyverse)
 gapminder_orig <- 
   read.csv(
@@ -881,15 +758,6 @@ plot_it <- function(df) {
 
 gapminder %>% plot_it
 
-# To apply mutate functions to a list-column (i.e. a tibble column)
-# you need to wrap the function you want to apply in a map function.
-
-df_nested %>%
-  mutate(dimensions = glue::glue(map_int(data,nrow), " X ", map_int(data,ncol)))
-
-# another example, calculate average life expentency in each continit
-df_nested %>%
-  mutate(life_expect = map_dbl(data, ~ mean(.$lifeExp)))
 
 ```
 
@@ -897,6 +765,7 @@ df_nested %>%
 
 
 ```{r nested tibbles (analogous to window functions)}
+suppressWarnings(suppressMessages(library(tidyverse)))
 library(tidyverse)
 is_tibble(gapminder)
 
@@ -957,15 +826,23 @@ gapminder %>%
   transmute(continent, lm_tidy) %>%
   unnest(cols = c(lm_tidy)) # explode nested tibbles rows into containing df
 
+# To apply mutate functions to a list-column (i.e. a tibble column)
+# you need to wrap the function you want to apply in a map function.
+
+df_nested %>%
+  mutate(dimensions = glue::glue(map_int(data,nrow), " X ", map_int(data,ncol)))
+
+# another example, calculate average life expentency in each continit
+df_nested %>%
+  mutate(life_expect = map_dbl(data, ~ mean(.$lifeExp)))
 
 ```
-```{r}
 
 
-```
 
 ```{r map_df, split, keep, discard, stringr, head_while, tail_while, rerun}
-
+suppressWarnings(suppressMessages(library(tidyverse)))
+library(tidyverse)
 # map(element's index) extracts an element in the index from all nested lists
 
 list(ids = 1:3, values=c("one", "two", "three")) %>%
@@ -1024,6 +901,7 @@ rerun(.n = 10, rnorm(10)) %>%
 
 
 ```{r reduce, accumulate, merge}
+suppressWarnings(suppressMessages(library(tidyverse)))
 library(tidyverse)
 # reduce /  reduce_right is R's foldleft / foldRight
 
@@ -1100,7 +978,8 @@ library(expm)
 
 
 ```{r}
-
+suppressWarnings(suppressMessages(library(tidyverse)))
+library(tidyverse)
 ## A general-purpose adder:
 add <- function(x) Reduce("+", x)
 add(list(1, 2, 3))
@@ -1155,6 +1034,7 @@ Filter(Negate(is.function),  sapply(ls(baseenv()), get, baseenv()))
 ```
 
 ```{r raandom walk simulation}
+suppressWarnings(suppressMessages(library(tidyverse)))
 library(tidyverse)
 
 rerun(5, rnorm(100)) %>%
@@ -1204,6 +1084,7 @@ combnV(4, 1:4, sum)
 ```
 
 ```{r some preprocessing}
+suppressWarnings(suppressMessages(library(tidyverse)))
 library(tidyverse)
 
 wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", 
@@ -1245,3 +1126,11 @@ char.to.fctor <- function(df)
 
 
 ```
+
+* References :
+    + Advanced R second edition by Hadley Wickham
+    + http://www.rebeccabarter.com/blog/2019-08-19_purrr/
+    + https://suzanbaert.netlify.app/2018/01/dplyr-tutorial-1/
+    + https://suzanbaert.netlify.app/2018/01/dplyr-tutorial-2/
+    + https://suzanbaert.netlify.app/2018/01/dplyr-tutorial-3/
+    + https://suzanbaert.netlify.app/2018/01/dplyr-tutorial-4/
