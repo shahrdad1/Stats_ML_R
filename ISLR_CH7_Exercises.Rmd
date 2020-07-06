@@ -619,15 +619,14 @@ locv1 <- function(x1, y1, nd, span, ntrial)
 }
 ```
 
-```{r Exercise 6}
+```{r Exercise 6 part a}
 library(tidyverse)
 library(mgcv)
 
 
-wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", 
-                      header=T, stringsAsFactors = F, na.strings = "?")
-(wage.df.original = tibble(wage.df))
-(wage.df = tibble(wage.df))
+wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", header=T, stringsAsFactors = F, na.strings = "?")
+wage.df.original = tibble(wage.df)
+wage.df = tibble(wage.df)
 
 # remove empty characters and NA helper
 remove.empty.characters <- function(df) 
@@ -644,8 +643,8 @@ trim.f <- function(col, na.rm = F) {
 }
 
 trim.spaces <- function(df)
-  (df %>%
-    mutate_if(is.character, trim.f, na.rm = T))
+  df %>%
+    mutate_if(is.character, trim.f, na.rm = T)
 
 # Finally convert character columns to factor
 
@@ -654,40 +653,172 @@ char.to.fctor <- function(df)
     mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
 
 
-(wage.df <- 
+wage.df <- 
   wage.df %>%
   na.omit() %>%
   trim.spaces() %>%
   remove.empty.characters() %>%
-  char.to.fctor())
+  char.to.fctor()
   
 
 # Polynomial regression to predict wage using age and find the degree with cv
 set.seed(1)
 k <- 10
-degrees <- 1:10
+degrees <- 1:5
 
 # create k folds
 folds <- sample(1:k, nrow(wage.df), replace = T)
-table(folds)
+
 cv.result <- tibble(degree=NULL, cv.mse = NULL)
 
 for (degree in degrees){
-  
+  test.mses <- double(length(folds))
   for (fold in folds){
     fit.poly <- lm(wage ~ poly(age, degree), data = wage.df[folds != fold, ])
     predicts <- predict(fit.poly, 
                         newdata = list(age=wage.df[folds == fold, ]$age), se=T)
     testMSE <- mean((predicts$fit - wage.df[folds == fold, ]$wage)^2)
-    
+    test.mses <- c(test.mses, testMSE)
   }
-  cv.result<- rbind(cv.result, degree = degree, )
+  cv.result<- rbind(cv.result, tibble(degree = degree, cv.mse=mean(test.mses)))
 
 }
+cv.result
+
+# Among ploynimials of degrees 1 to 5 , CV shows ploynomial with degree 
+# 4 has smallest MSE.
+# ----------- Expect to get the same result when using ANOVA ------------------ 
+# perform an analysis of variance (ANOVA, using an F-test) in order to test the 
+# null hypothesis that a model M1 is sufficient to explain the data against the 
+# alternative hypothesis that a more complex model M2 is required.
+# M1 and M2 must be nested models. Model M1 ploynomial with smaller degree is nested 
+# in model M2 which has polynomial with larger degree.
+
+# Note that ANOVA is all  based on training data only
+nested.models <- 1:5 %>% map(~lm(wage ~ poly(age, .), data = wage.df))
+do.call("anova", nested.models)
+
+# ploynomial with degree 1 comparing with ploynomial with degree 2 
+# has almost zero p-value (2.2e-16) showing model is not enough.
+# similarly ploynimial degree 2 comparing with degree 3 shows smaller 
+# p-value. Comparing Plynomial degree 3 to degree 4 show still smaller p-value 
+# but ploynomial with degree 4 has the best p-value(0.051046)
+# Ploynomial with degree 5 is unnecessarily too complex (p-va;ue > 0.05).
+# So models with plynomial degree 3 or 4 are best fit, which is align
+# with whqt we got from CV.
+
+# --------------  Use orthogonal polynomial to find p-values -----------------
+
+# We can use the fact that poly() creates orthogonal polynomials.'
+# so we can obtain p-values for each model using summary() function:
+# note that square of t-statistics here is equal to -statistics from anova()
+
+coef(summary(nested.models[[5]]))
 
 
+# ANOVA method works whether or not we used orthogonal polynomials
+# particularly when we have other terms in the model
 
 
+# lets draw the prediction
+age.range <- range(wage.df$age)
+age.grid <- seq (age.range[[1]], age.range[[2]])
+preds <- predict(lm(wage ~ poly(age, 4), data = wage.df), newdata = tibble(age = age.grid), se=T)
+se.bands <- cbind(preds$fit + 2 * preds$se.fit , preds$fit - 2 * preds$se.fit )
+plot(wage.df$age, wage.df$wage, xlim = age.range, cex=0.5, col="darkgray")
+title("Degree 4 polynomial ", outer = T)
+lines(age.grid, preds$fit, lwd=2, col="blue")
+matlines(age.grid, se.bands, lwd=1, col="red", lty=3)
+```
+
+
+```{r Exercise 6 part b}
+library(tidyverse)
+library(mgcv)
+
+
+wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", header=T, stringsAsFactors = F, na.strings = "?")
+wage.df.original = tibble(wage.df)
+wage.df = tibble(wage.df)
+
+# remove empty characters and NA helper
+remove.empty.characters <- function(df) 
+  df %>%
+    select_all %>%
+    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+
+# Next remove leading and trailing spaces from all elements in character columns
+trim.f <- function(col, na.rm = F) { 
+  isNA <- !reduce(col, ~ (is.na(.x) & is.na(.y)))
+  if (na.rm && isNA) 
+    unlist(map(col, ~ (if (is.na(.x)) "" else .x) ),use.names = F)
+  else trimws(col, which = c("both")) # leading and trailing spaces
+}
+
+trim.spaces <- function(df)
+  df %>%
+    mutate_if(is.character, trim.f, na.rm = T)
+
+# Finally convert character columns to factor
+
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+
+wage.df <- 
+  wage.df %>%
+  na.omit() %>%
+  trim.spaces() %>%
+  remove.empty.characters() %>%
+  char.to.fctor()
+
+# Fit a step function to predict wage using age
+# use cv to find optimal number of cuts
+
+# we use cut function to unformly cut the quantiles
+table(cut(wage.df$age, 4))
+
+
+# use cv to find number of cuts
+set.seed(12)
+cuts <- 2:10
+k = 10
+row.indices <- sample(1:k, nrow(wage.df), replace = T)
+
+cv.result <- tibble(cuts = NULL, cv.mse = NULL)
+for (k in cuts){
+  # cut needs to have its own column in dataframe
+
+  wage.df$age_cut <- cut(wage.df$age, k)
+  cv.mses <- double(length(cuts))
+  for (row.index.test in row.indices){
+    #  If we do below line we get : "factor cut(age, k) has new levels "
+    # problem is cut(age, k) existed only as an inline creation within your lm()   
+    #  step.model <- lm(wage~cut(age, k), data=wage.df[row.indices != row.index.test, ])
+    step.model <- lm(wage~age_cut, data=wage.df[row.indices != row.index.test, ])
+    preds <- predict(step.model, newdata=wage.df[row.indices == row.index.test, ], se=T)
+    cv.mses = c(cv.mses, mean((preds$fit - wage.df[row.indices == row.index.test, ]$wage)^2))
+  }
+  cv.result <- rbind(cv.result , tibble(cuts = k, cv.mse = mean(cv.mses))) 
+}
+cv.result
+
+# cv shows 8 cuts is the best, lets make a model with 8 cuts:
+wage.df$age_cut <- cut(wage.df$age, 8)
+step.model <- lm(wage~age_cut, data=wage.df[row.indices != row.index.test, ])
+preds <- predict(step.model, newdata=wage.df[row.indices == row.index.test, ], se=T)
+
+# lets draw the prediction
+age.range <- range(wage.df$age)
+age.grid <- seq (age.range[[1]], age.range[[2]])
+age.grid.cut = cut(age.grid, 8)
+preds <- predict(step.model, newdata = tibble(age_cut = age.grid.cut), se=T)
+se.bands <- cbind(preds$fit + 2 * preds$se.fit , preds$fit - 2 * preds$se.fit )
+plot(wage.df$age, wage.df$wage, xlim = age.range, cex=0.5, col="darkgray")
+title("step function with 8 cuts ", outer = T)
+lines(age.grid, preds$fit, lwd=2, col="blue")
+matlines(age.grid, se.bands, lwd=1, col="red", lty=3)
 
 ```
 
