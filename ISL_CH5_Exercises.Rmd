@@ -512,9 +512,9 @@ library(boot)
 
 # a ) generate simulated data set:
 set.seed(1)
-y = rnorm(100)
-x = rnorm(100)
-y = x - 2*x^2+rnorm(100)
+y <- rnorm(100)
+x <- rnorm(100)
+y <- x - 2*x^2+rnorm(100)
 
 df <- tibble(y = y, x = x)
 head(df)

@@ -804,6 +804,10 @@ for (k in cuts){
 }
 cv.result
 
+plot(cv.result,xlab='Number of cuts',ylab='Cross Validation Error',type='l')
+x=which.min(cv.result$cv.mse)
+points(x,cv.result[x, ]$cv.mse,pch=20,cex=2,col='red')
+
 # cv shows 8 cuts is the best, lets make a model with 8 cuts:
 wage.df$age_cut <- cut(wage.df$age, 8)
 step.model <- lm(wage~age_cut, data=wage.df[row.indices != row.index.test, ])
@@ -821,5 +825,888 @@ lines(age.grid, preds$fit, lwd=2, col="blue")
 matlines(age.grid, se.bands, lwd=1, col="red", lty=3)
 
 ```
+
+```{r Exercise 7}
+
+# Explore the relationships between some of these other predictors and wage, 
+# and use non-linear fitting techniques in order to fit flexible models to the data. 
+# Create plots of the results obtained, and write a summary of your findings.
+
+library(boot)
+library(tidyverse)
+library(mgcv)
+
+
+wage.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Wage.csv", header=T, stringsAsFactors = F, na.strings = "?")
+wage.df.original = tibble(wage.df)
+wage.df = tibble(wage.df)
+
+# remove empty characters and NA helper
+remove.empty.characters <- function(df) 
+  df %>%
+    select_all %>%
+    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+
+# Next remove leading and trailing spaces from all elements in character columns
+trim.f <- function(col, na.rm = F) { 
+  isNA <- !reduce(col, ~ (is.na(.x) & is.na(.y)))
+  if (na.rm && isNA) 
+    unlist(map(col, ~ (if (is.na(.x)) "" else .x) ),use.names = F)
+  else trimws(col, which = c("both")) # leading and trailing spaces
+}
+
+trim.spaces <- function(df)
+  df %>%
+    mutate_if(is.character, trim.f, na.rm = T)
+
+# Finally convert character columns to factor
+
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+
+wage.df <- 
+  wage.df %>%
+  na.omit() %>%
+  trim.spaces() %>%
+  remove.empty.characters() %>%
+  char.to.fctor()
+
+# "sex" and "region" are factors with single levels are constants and to be rmoved
+wage.df <- wage.df %>%
+  select(-c(sex, region))
+
+# wage (DV) is factor/continous (and hoefully normal). 
+# To see its relation with 1 or more interval IVs and/or 1 or more categorical IVs
+# we use multiple regression
+#(see: https://stats.idre.ucla.edu/other/mult-pkg/whatstat/)
+
+summary(glm(wage ~ ., data = wage.df))
+
+# summary shows only "maritl", "education", "health_ins"
+# are sinnificantly important, in other word  "wage"
+# has relationship with these 4 DV
+
+# First note that all the IVs that has relationship with DV are factors so we 
+# use step function to model them. Let's model each one separately using step function:
+library(grid)
+library(gridExtra)
+fit.step.model <- function(df, DV, IVs, seed=1113){
+  frm <- as.formula(glue::glue(DV,"~", str_c(IVs, collapse = "+")))
+  model.fit <- glm(frm, data = df)
+  new.sample <- sample( levels(df [[IVs]]), 1000, replace=T)
+  new.df = tibble(factor(new.sample))
+  names(new.df) <- IVs
+  preds <- predict(model.fit, newdata=new.df, se=T)
+  
+  se.bands <- cbind(preds$fit + 2 * preds$se.fit , preds$fit - 2 * preds$se.fit )
+  
+  data.to.draw <- tibble(x = factor(new.sample), y = preds$fit, 
+                         y.se.1 = preds$fit + 2 * preds$se.fit, 
+                         y.se.2 = preds$fit - 2 * preds$se.fit)
+  
+  # draw box plots for quality columns
+  g1 <- ggplot(df, aes(factor(.data[[IVs]]), .data[[DV]], color = factor(.data[[IVs]]))) +
+    geom_bar(aes(factor(.data[[IVs]]), .data[[DV]]),  stat = "summary", fun.y = mean) +
+    stat_summary(fun.data = mean_sdl, width=0.05, geom = "errorbar",fun.y = mean) 
+
+  
+  #the sample we predict on
+  g2 <- ggplot(data.to.draw, aes(x=x)) +
+    geom_boxplot(aes(y = y, colour = DV)) +
+    geom_boxplot(aes(y = y.se.1, colour = "standard error")) +
+    geom_boxplot(aes(y = y.se.2, colour = "standard error"))
+
+  grid.arrange(g1, g2, nrow = 1,
+             top = textGrob("Step function fitted to a qualitative data"))
+}
+
+fit.step.model(wage.df, "wage", "maritl")
+fit.step.model(wage.df, "wage", "education")
+fit.step.model(wage.df, "wage", "health_ins")
+
+
+
+```
+
+```{r Exercise 8}
+library(boot)
+library(tidyverse)
+library(dataPreparation)
+library(mgcv)
+
+auto.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Auto.csv", header=T, stringsAsFactors = F, na.strings = "?")
+auto.df.original = tibble(auto.df)
+auto.df = tibble(auto.df)
+
+# remove empty characters and NA helper
+remove.empty.characters <- function(df) 
+  df %>%
+    select_all %>%
+    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+
+# Next remove leading and trailing spaces from all elements in character columns
+trim.f <- function(col, na.rm = F) { 
+  isNA <- !reduce(col, ~ (is.na(.x) & is.na(.y)))
+  if (na.rm && isNA) 
+    unlist(map(col, ~ (if (is.na(.x)) "" else .x) ),use.names = F)
+  else trimws(col, which = c("both")) # leading and trailing spaces
+}
+
+trim.spaces <- function(df)
+  df %>%
+    mutate_if(is.character, trim.f, na.rm = T)
+
+# Finally convert character columns to factor
+
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+
+auto.df <- 
+  auto.df %>%
+  na.omit() %>%
+  trim.spaces() %>%
+  remove.empty.characters() %>%
+  char.to.fctor()
+
+# remove constant variables
+(constant_cols <- whichAreConstant(auto.df))
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(auto.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(auto.df))
+
+# we fit smoothing spine and step function using GAM'
+# bs="cr" cubic regression spline
+# Gamma is usefull because DV (i.e mpg) is strictly positive real valued
+# also defaukt link is used in some waiting time applications, log link is most often used
+# Use GCV.CP to estimate the parameter
+# k-1 is upper limit for degree of freedom using GCV
+# gamma = 1.2 since GCV tends to slightly overfit
+# bs="cr" is cubic regression , default is thin plate spline which is computatinally very heavy
+
+model.fit <- gam(mpg ~ s(displacement, bs="cr", k= 13) + 
+             s(horsepower, bs="cr", k= 13) + s(weight, bs="cr", k= 13) +
+             s(acceleration, bs="cr", k= 13) + name + cylinders + year + origin, 
+             method="GACV.Cp", scale=-1,family = Gamma(link=log), data=auto.df, gamma = 1.2)
+
+model.fit
+
+plot(model.fit,residuals=TRUE,pch=19)
+
+gam.check(model.fit)
+plot(fitted(model.fit),residuals(model.fit))
+plot(auto.df$displacement,residuals(model.fit))
+plot(auto.df$horsepower,residuals(model.fit))
+plot(auto.df$weight,residuals(model.fit))
+# vis.gam(model.fit,theta=-45,ticktype="detailed",se=2)
+# vis.gam(model.fit,theta=30,ticktype="detailed")
+# vis.gam(model.fit,plot.type="contour")
+
+# Model shows there is a non linear relationship between 
+# mpg on one hand and  horsepower and acceleration on the other hand
+# however mpgg has linear relation with displacement and 
+
+
+# to check the robostness model with different criterion 
+# (i.e. "ML" or "REML" versus "GCV.Cp" or "GACV.Cp")
+# because likelihood based methods tend to be more robust
+
+model.fit1 <- gam(mpg ~ s(displacement, bs="cr", k= 13) + 
+             s(horsepower, bs="cr", k= 13) + s(weight, bs="cr", k= 13) +
+             s(acceleration, bs="cr", k= 13) + name + cylinders + year + origin, 
+             method="ML", scale=-1,family = Gamma(link=log), data=auto.df, gamma = 1)
+
+model.fit1
+
+plot(model.fit1,residuals=TRUE,pch=19)
+
+gam.check(model.fit1)
+plot(auto.df$displacement,residuals(model.fit1))
+plot(auto.df$horsepower,residuals(model.fit1))
+plot(auto.df$weight,residuals(model.fit1))
+
+# Clearly ML has a tendency to overfit, therefore we see all models have high edf 
+# vis.gam(model.fit1,theta=-45,ticktype="detailed",se=2)
+# vis.gam(model.fit1,theta=30,ticktype="detailed")
+# vis.gam(model.fit1,plot.type="contour")
+
+```
+```{r Exercise 9}
+library(boot)
+library(tidyverse)
+library(dataPreparation)
+library(splines)
+
+boston.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/BostonHousing.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+boston.df <- tibble(boston.df)
+
+# see if there is any NA in any records
+nrow(df[which(is.na(boston.df)),])
+
+# No NA anywhere , let's do usual clean up:
+
+# remove constant variables
+constant_cols <- whichAreConstant(boston.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(boston.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(boston.df))
+
+# a) use ploynomial regression to predict nox using dis
+
+# Now fit a 4 degree polynomial
+fit.poly <- glm(nox ~ poly(dis, 3), data = boston.df)
+
+# Here is the regression output
+# polynomial coefficients are all statistically significamt
+summary(fit.poly)
+
+# draw standard error 
+# first get the range of the values of dis
+(dis.limits  <- range(boston.df$dis))
+
+# Now create an interaval from these range values
+(dis.grid <- seq(from=dis.limits[1], to=dis.limits[2]))
+
+# predict value for this interval using fitted model
+predicts <- predict(fit.poly, newdata = tibble(dis=dis.grid), se=T)
+names(predicts)
+
+se.bands <- cbind(predicts$fit + 2*predicts$se.fit, 
+                  predicts$fit - 2*predicts$se.fit)
+
+# now plot the predicts
+plot(boston.df$dis, boston.df$nox, xlim=dis.limits, cex=0.5, col="darkgrey")
+title("Degree 3 polynomial", outer = F)
+lines(dis.grid, predicts$fit, lwd=2, col = "blue")
+matlines(dis.grid, se.bands, lwd=2, col="red", lty=3)
+
+
+
+res <- residuals(fit.poly, type = "response")
+# ensure that x- and y-axis have the same range
+pred <- fit.poly$fitted.values
+
+observed <- boston.df$nox
+# determine maximal range
+val.range <- range(pred, observed)
+plot(observed, pred, 
+    xlim = val.range, ylim = val.range,  
+    xlab = "Observed nax", 
+    ylab = "Predicted nox",
+    main = "Residuals of the linear model for the training data")
+# show ideal prediction as a diagonal
+abline(0,1, col = "red")
+# add residuals to the plot
+segments(observed, pred, observed, pred + res)
+
+# calculate RSS
+rss <- res %>% reduce( ~.x + .y^2 , .init = 0) %>% unlist
+
+
+# ----------------------------------------------------------------
+# b) plot plynomial fit for a range of degrees and report each rss
+# ----------------------------------------------------------------
+fit.ploys.fun <- function (df, IV, DV, i) {
+    
+  # Now fit a polynomial with degree i
+  frm <- as.formula(glue::glue(DV," ~ poly(",IV,",",i,")"))
+  fit.poly <- glm(frm, data = df)
+
+  # Here is the regression output
+  # polynomial coefficients are all statistically significamt
+  summary(fit.poly)
+  
+  # draw standard error 
+  # first get the range of the values of dis
+  IV.limits  <- range(df[[IV]])
+  
+  # Now create an interaval from these range values
+  IV.grid <- seq(from=IV.limits[1], to=IV.limits[2])
+  
+  # predict value for this interval using fitted model
+  new.data <- tibble(IV.grid)
+  names(new.data)  <- IV
+  predicts <- predict(fit.poly, newdata = new.data, se=T)
+  
+  se.bands <- cbind(predicts$fit + 2*predicts$se.fit, 
+                    predicts$fit - 2*predicts$se.fit)
+  
+  # now plot the predicts
+  plot(df[[IV]], df[[DV]], xlim=IV.limits, cex=0.5, col="darkgrey")
+  title(glue::glue("Degree ",i, " polynomial"), outer = F)
+  lines(IV.grid, predicts$fit, lwd=2, col = "blue")
+  matlines(IV.grid, se.bands, lwd=2, col="red", lty=3)
+  
+  res <- residuals(fit.poly, type = "response")
+  
+  # calculate RSS
+  res %>% reduce( ~.x + .y^2 , .init = 0) %>% unlist
+
+}
+
+# RSS for ploynomilas degree 1 to 10 
+1:10 %>% reduce (~append(.x,fit.ploys.fun(boston.df, "dis", "nox", .y)), 
+                 .init = NULL)
+
+# c) perform cross validation to find optimal degree for cross validation
+
+set.seed(1113)
+k <- 10
+degrees <- 2:10
+
+# bootstrap resampling
+row.indices <- sample(1:k, nrow(boston.df), replace = T)
+
+results <- tibble(degrees=NULL, cv.mse=NULL)
+
+poly.cv <- function(df, DV, IV, row.indices, degree){
+  test.mses <- double(k)
+  for(test.index in 1:k){
+    frm <- formula(glue::glue(DV , "~" , "poly(",IV,",",degree,")"))
+    train.model <- glm(frm, data = df[row.indices != test.index,])
+    
+    # now predict it on test rows
+    new.data <- tibble(x = df[row.indices == test.index,][[IV]])
+    names(new.data) <- IV
+    predicts <- predict(train.model, newdata = new.data, se=T)
+    test.mses <- c(test.mses, 
+                   mean((df[row.indices == test.index,][[DV]] - predicts$fit)^2))
+  }
+  tibble(degrees=degree, cv.mse=mean(test.mses))
+}
+
+results <- 
+  degrees %>% 
+  reduce(~rbind(.x,poly.cv(boston.df, "nox", "dis",row.indices, .y)), 
+                   .init = results)
+
+# plot the min degree
+plot(results, xlab = "polynomial degrees", ylab="CVMSE",type = "l")
+
+index <- which.min(results$cv.mse)
+points(index, results$cv.mse[index], col="red", cex=2, pch=20)
+
+# so degree 2 is most optimized degree for the polynomial based on CV
+
+
+#d) use bs() to fit regression spline to predict nox using dis using 4 degrees of freedom
+k <- 4
+
+fit <- glm(nox~bs(dis, knots = cut(dis, k)) ,data=boston.df)
+
+# first get the range of the values of dis
+(dis.limits  <- range(boston.df$dis))
+
+# Now create an interaval from these range values
+dis.grid <- seq(from=dis.limits[1], to=dis.limits[2], length.out = 100)
+
+# predict the nox values 
+pred <- predict(fit, newdata = list(dis=dis.grid), se=T)
+plot(boston.df$dis, boston.df$nox, col="gray")
+lines(dis.grid, pred$fit, lwd=2)
+se_bonds <- cbind(pred$fit+2*pred$se, pred$fit-2*pred$se)
+matlines(dis.grid, se_bonds, lwd=2, col="red", lty=3)
+
+# knots are chosen uniformly
+# Since Boston DF is too small , only 3 degree os freedom is chosen by R
+
+# e) fit a regression splines with range of degrees of freedom and reort resulting RSS
+regression.spline <- function(k){
+  fit <- glm(nox~bs(dis, df = k) ,data=boston.df)
+  
+  # first get the range of the values of dis
+  (dis.limits  <- range(boston.df$dis))
+  
+  # Now create an interaval from these range values
+  (dis.grid <- seq(from=dis.limits[1], to=dis.limits[2]))
+  
+  # predict the nox values 
+  pred <- predict(fit, newdata = list(dis=dis.grid), se=T)
+  plot(boston.df$dis, boston.df$nox, col="gray")
+  title(glue::glue("Degree of freedom: ", k), outer = F)
+  lines(dis.grid, pred$fit, lwd=2)
+  se_bonds <- cbind(pred$fit+2*pred$se, pred$fit-2*pred$se)
+  matlines(dis.grid, se_bonds, lwd=2, col="red", lty=3)
+  
+  rse <- residuals(fit, type = "response") 
+  
+  # calculate RSS
+  res %>% reduce( ~.x + .y^2 , .init = 0) %>% unlist
+    
+}
+regression.spline(2)
+regression.spline(3)
+regression.spline(4)
+results <- tibble(degree.of.freedom = NULL, rse=NULL)
+results <- 2:10 %>%
+  reduce(~rbind(.x, tibble(degree.of.freedom = .y , 
+                           rse = regression.spline(.y))), 
+         .init=results)
+  
+results
+
+# Since Boston DF is too small , only 3 degree os freedom is chosen by R
+
+# f) Perform cross validation to select the best fegree of freedom
+ # since number of data is not enough , matrix of the model will have
+ # rank defficiency do cross validation would give the same result.
+
+
+
+```
+
+```{r Exercise 10}
+
+library(leaps)
+library(tidyverse)
+library(dataPreparation)
+library(mgcv)
+
+# first define some helpers 
+# remove empty characters and NA helper
+remove.empty.characters <- function(df) 
+  df %>%
+    select_all %>%
+    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+
+# Next remove leading and trailing spaces from all elements in character columns
+trim.f <- function(col, na.rm = F) { 
+  isNA <- !reduce(col, ~ (is.na(.x) & is.na(.y)))
+  if (na.rm && isNA) 
+    unlist(map(col, ~ (if (is.na(.x)) "" else .x) ),use.names = F)
+  else trimws(col, which = c("both")) # leading and trailing spaces
+}
+
+trim.spaces <- function(df)
+  df %>%
+    mutate_if(is.character, trim.f, na.rm = T)
+
+# Finally convert character columns to factor
+
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+# ------------  read the data ----------------
+
+college.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/College.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+college.df <- tibble(college.df)
+
+# a) First and foremost lets split data to 80% train and the rest test 
+
+set.seed(1113)
+train.idx <- sample(1:nrow(college.df), 0.8*nrow(college.df))
+test.idx <- setdiff(1:nrow(college.df), train.idx)
+
+train.df <- college.df[train.idx, ]
+test.df <- college.df[test.idx, ]
+
+# --------------- prepare train data ----------------------
+# see if there is any NA in any records
+nrow(df[which(is.na(train.df)),])
+
+# No NA anywhere , let's do usual clean up:
+
+# remove constant variables
+constant_cols <- whichAreConstant(train.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(train.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(train.df))
+
+# It is safe now to convert all character fields into factors
+
+train.df <- 
+  train.df %>%
+  na.omit() %>%
+  trim.spaces() %>%
+  remove.empty.characters() %>%
+  char.to.fctor()
+
+# --------------- prepare test data ----------------------
+
+# see if there is any NA in any records
+nrow(df[which(is.na(test.df)),])
+
+# No NA anywhere , let's do usual clean up:
+
+# remove constant variables
+constant_cols <- whichAreConstant(test.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(test.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(test.df))
+
+# It is safe now to convert all character fields into factors
+
+test.df <- 
+  test.df %>%
+  na.omit() %>%
+  trim.spaces() %>%
+  remove.empty.characters() %>%
+  char.to.fctor()
+
+
+# ---------- stepwise forward feature selectin with CV -----------#
+
+k.fold <- 10
+
+set.seed(1113)
+
+# create k folds
+folds <- sample(1:k.fold, nrow(train.df), replace = T)
+
+# number of features
+noOfFeatures <- ncol(train.df) -1
+
+
+cv.errors <- matrix(NA, k.fold, noOfFeatures, 
+                    dimnames = list(NULL, paste(1:noOfFeatures)))
+
+
+# perform a cross validation on a for loop
+for (j in 1:k.fold){
+  # step# 2 of algorithm 6.2 page 207 is evaluated on all folds except one of 
+  # them each time it chooses best models with number of features 
+  # 1,2,..., noOfFeatures on k-1 training folds.
+  best.fit <- regsubsets(Outstate ~ ., data = train.df[folds != j, ], 
+                         nvmax = noOfFeatures, method = "forward")
+
+  # now compute CV test error for each of  models that have best number of 
+  # predictors on test fold # j 
+  for(i in 1:noOfFeatures){
+    # extract coefficients for model # i
+    coefi <- coef(best.fit, id = i)
+    
+    # For GAM we are interested in name 
+    # of features for model # i (not their coefficients)
+    # except intercept
+    col.names <- names(coefi)[-1]
+    
+    # first separate factors , then remove "Yes" from the end of factor name and 
+    #finally drop "(Intercept)"
+    
+    factor.post.script <- "Yes"
+    intercept.name <- "(Intercept)"
+
+    regular.features <- col.names %>% 
+      keep(!str_detect(., factor.post.script)) %>%
+      discard(str_detect(., intercept.name))
+    
+    factor.features <- col.names %>% 
+        keep(str_detect(., factor.post.script)) %>%
+        str_replace(factor.post.script, "")
+        
+    # now dynamically build the formula
+    
+    k = 10
+    bs = "\"cr\""
+    
+    regular.part <- regular.features %>%
+      map(~glue::glue("s(",.,", bs=",bs,","," k=",k,")")) %>%
+      str_c(., collapse = " + ")
+    
+    factor.part <- factor.features %>% str_c(., collapse = " + ")
+    
+    formula <- 
+      case_when(
+        factor.part != "" & regular.part != "" ~ glue::glue("Outstate ~ " , 
+                                                            regular.part , 
+                                                            " + ", 
+                                                            factor.part),
+        
+        factor.part != "" & regular.part == "" ~ glue::glue("Outstate ~ " , 
+                                                            factor.part),
+  
+        factor.part == "" & regular.part != "" ~ glue::glue("Outstate ~ " , 
+                                                    regular.part)
+      )
+      
+
+    model.fit <- gam(as.formula(formula),method="GACV.Cp", scale=-1,
+                                family = Gamma(link=log), 
+                                data=train.df[folds != j, ], gamma = 1)
+    
+#    apply model on test fold and accumulate the test errors
+    preds <- predict(model.fit, newdata = train.df[folds == j, ], se=TRUE)
+    cv.errors[j,i] <- mean ((preds$fit - train.df[folds == j, ]$Outstate)^2)
+
+  }
+}
+
+# finally calculate mean of CV MSE error for each model
+cv.error.means <- rep(NA, ncol(cv.errors))
+for (l in 1:ncol(cv.errors)){
+  cv.error.means[l] <- mean(cv.errors[ ,l])
+}
+
+
+print("most optimal No. of selected covariates")
+(covariates.selected <- which.min(cv.error.means))
+
+gam.best.fit <- regsubsets(Outstate ~ ., data = train.df, 
+                         nvmax = ncol(train.df), method = "forward")
+
+plot(1/nrow(train.df)*summary(gam.best.fit)$rss,type='l',xlab='Number of Predictors',ylab='Train MSE Score',xaxt='n')
+axis(side=1,at=seq(1,17,2),labels = seq(1,17,2))
+
+
+
+print("Seems like 7 is the good choice selected covariates:")
+which(summary(gam.best.fit)$which[7,-1])
+
+(covariates.selected.names <- names(coef(gam.best.fit, id = 7)))
+
+# "Private", "Room.Board", "Personal", "Terminal", "perc.alumni", "Expend", "Grad.Rate"  
+
+
+# b) ---------------- Apply GAM ---------------------
+
+# first separate factors , then remove "Yes" ate the end of factor name and finally drop intercept
+factor.post.script <- "Yes"
+intercept.name <- "(Intercept)"
+
+regular.features <- covariates.selected.names %>% 
+  keep(!str_detect(., factor.post.script)) %>%
+  discard(str_detect(., intercept.name))
+
+factor.features <- covariates.selected.names %>% 
+    keep(str_detect(., factor.post.script)) %>%
+    str_replace(factor.post.script, "")
+    
+# now dynamically build the formula
+
+k = 20
+bs = "\"cr\""
+
+# regular.part <- regular.features %>%
+#   map(~glue::glue("s(",.,")")) %>%
+#   str_c(., collapse = " + ")
+
+
+regular.part <- regular.features %>%
+  map(~glue::glue("s(",.,", bs=",bs,","," k=",k,")")) %>%
+  str_c(., collapse = " + ")
+
+factor.part <- factor.features %>% str_c(., collapse = " + ")
+  
+formula <- 
+  case_when(
+    factor.part != "" & regular.part != "" ~ glue::glue("Outstate ~ " , 
+                                                        regular.part , 
+                                                        " + ", 
+                                                        factor.part),
+    
+    factor.part != "" & regular.part == "" ~ glue::glue("Outstate ~ " , 
+                                                        factor.part),
+
+    factor.part == "" & regular.part != "" ~ glue::glue("Outstate ~ " , 
+                                                regular.part)
+  )
+
+# "Private", "Room.Board", "Personal", "Terminal", "perc.alumni", "Expend", "Grad.Rate"  
+
+
+print ("-------------- GAM -----------------")
+best.model.fit <- gam(as.formula(formula),method="GACV.Cp", scale=-1,
+                            family = Gamma(link=log), 
+                            data=train.df, gamma = 1.5)
+
+print.gam(best.model.fit)
+
+print ("-------------- model checking -----------------")
+gam.check(best.model.fit)
+
+# finally draw the plots
+plot.gam(best.model.fit)
+
+rsd <- residuals(best.model.fit,type="deviance")
+print(" ------ Check value of K is large enough for Room.Board ------------")
+gam(rsd~s(Room.Board,k=20)-1,data=train.df,select=TRUE)  # -1 supresses the intercept
+
+print(" ------ Check value of K is large enough for Personal ------------")
+gam(rsd~s(Personal,k=20)-1,data=train.df,select=TRUE)  # -1 supresses the intercept
+
+print(" ------ Check value of K is large enough for Terminal ------------")
+gam(rsd~s(Terminal,k=20)-1,data=train.df,select=TRUE)  # -1 supresses the intercept
+
+print(" ------ Check value of K is large enough for perc.alumni ------------")
+gam(rsd~s(perc.alumni,k=20)-1,data=train.df,select=TRUE)  # -1 supresses the intercept
+
+print(" ------ Check value of K is large enough for Expend ------------")
+gam(rsd~s(Expend,k=20)-1,data=train.df,select=TRUE)  # -1 supresses the intercept
+
+print(" ------ Check value of K is large enough for Grad.Rate ------------")
+gam(rsd~s(Grad.Rate,k=20)-1,data=train.df,select=TRUE)  # -1 supresses the intercept
+
+
+print("We can extract the lambdai estimates, and, for RE/ML smoothness
+selection, the covariance matrix of the log lambdai estimates.")
+best.model.fit$sp
+
+# Alternativly
+#gam.vcomp(best.model.fit)
+
+print(" Seems like the only statistically significant covariate is Room.Board")
+anova(best.model.fit)
+
+best.preds <- predict(best.model.fit, newdata = test.df, se=TRUE)
+
+# print(" matrix mapping the estimated coefficients to the linear predictor:")
+# Xp <- predict(best.model.fit,newdata=test.df,type="lpmatrix")
+# Xp%*%coef(best.model.fit) ## result same as predict(ct1,pd)
+
+# let's see how much variance explained by model
+tss <- mean((test.df$Outstate - mean(test.df$Outstate))^2)
+rss <- mean ((test.df$Outstate - best.preds$fit)^2)
+(r.squared <- 1 - rss/tss)
+
+
+# Clearly  many of the predictors are NOT statistically significant and thus
+# the model does not explain any variation in response.
+
+plot(best.model.fit, too.far=0.15)
+
+
+print("-------------- use gam library to get a better result -----------------") 
+library(gam)
+
+regular.part <- regular.features %>%
+  map(~glue::glue("s(",.,,")")) %>%
+  str_c(., collapse = " + ")
+
+factor.part <- factor.features %>% str_c(., collapse = " + ")
+  
+formula <- 
+  case_when(
+    factor.part != "" & regular.part != "" ~ glue::glue("Outstate ~ " , 
+                                                        regular.part , 
+                                                        " + ", 
+                                                        factor.part),
+    
+    factor.part != "" & regular.part == "" ~ glue::glue("Outstate ~ " , 
+                                                        factor.part),
+
+    factor.part == "" & regular.part != "" ~ glue::glue("Outstate ~ " , 
+                                                regular.part)
+  )
+
+
+best.model.fit = gam(as.formula(formula), data = train.df)
+
+best.preds <- predict(best.model.fit, newdata = test.df)
+
+# let's see how much variance explained by model
+tss <- mean((test.df$Outstate - mean(test.df$Outstate))^2)
+rss <- mean ((test.df$Outstate - best.preds)^2)
+
+print("seems like with 'gam' librry we get more sensible result: ")
+(r.squared <- 1 - rss/tss)
+
+print("in this model all chosen covariates are statistically significant")
+summary(best.model.fit)
+
+
+plot(best.model.fit, se = T, col = "blue")
+print("Plot shows all covariates except 'private' are non linear")
+
+```
+```{r Exercise 11}
+library(tidyverse)
+# a) Generate response Y and predictor X1 and X2 using n = 100
+
+set.seed(1)
+x1 <- rnorm(100)
+x2 <- rnorm(100)
+y <- 1003.24 + 0.002*x1 - 0.0089*x2+rnorm(100)
+
+# b) initialize beta1.hat
+beta1.hat <- 0.2
+
+# c) keep beta1.hat fixed and fit the model 
+a <- y - beta1.hat * x1
+beta2.hat <- lm(a ~ x2)$coef[[2]]
+
+# d) keep beta2.hat fixed and fit the model 
+a <- y - beta2.hat * x2
+beta1.hat <- lm(a ~ x1)$coef[[2]]
+beta1.hat
+
+# e) repeat c and d above 100 times and plot the values
+
+beta1.hat <- -13.3
+result <- tibble(b0=0, b1=beta1.hat, b2=0)
+
+find.betas <- function(acc){
+  beta1.hat <- acc[nrow(acc), ]$b1
+  a1 <- y - beta1.hat * x1
+  model1 <- lm(a1 ~ x2)
+  beta2.hat <- model1$coef[[2]]
+
+  a2 <- y - beta2.hat * x2
+  model2 <- lm(a2 ~ x1)
+  beta1.hat <- model2$coef[[2]]
+  beta0.hat <- model2$coef[[1]]
+  
+  rbind(acc ,tibble(b0 = beta0.hat, b1 = beta1.hat, b2 = beta2.hat))
+}
+
+results <- 1:1000 %>%
+  reduce(~find.betas (.x), .init=result)
+
+dim(results)
+
+plot(1:1001, results$b0, type = "l", xlab = "iteration", ylab = "betas", ylim = c(-2.2, 
+    1.6), col = "green")
+lines(1:1001, results$b1, col = "red")
+lines(1:1001, results$b2, col = "blue")
+legend("center", c("beta0", "beta1", "beta2"), lty = 1, col = c("green", "red", 
+    "blue"))
+
+# f) perform a linear regression and compare thr coefficients
+model3 <- lm(y ~ x1 + x2)
+model3$coefficients
+
+# Results are very close
+#   (Intercept)            x1            x2 
+# 1003.26535343    0.02311017   -0.06236682 
+# 1003.265	       0.02311017	  -0.06236682
+
+plot(1:1001, results$b0, type = "l", xlab = "iteration", ylab = "betas", ylim = c(-2.2, 
+    1.6), col = "green")
+lines(1:1001, results$b1, col = "red")
+lines(1:1001, results$b2, col = "blue")
+legend("center", c("beta0", "beta1", "beta2"), lty = 1, col = c("green", "red", 
+    "blue"))
+abline(h = model3$coef[1], lty = "dashed", lwd = 3, col = rgb(0, 0, 0, alpha = 0.4))
+abline(h = model3$coef[2], lty = "dashed", lwd = 3, col = rgb(0, 0, 0, alpha = 0.4))
+abline(h = model3$coef[3], lty = "dashed", lwd = 3, col = rgb(0, 0, 0, alpha = 0.4))
+legend("center", c("beta0", "beta1", "beta2", "multiple regression"), lty = c(1, 
+    1, 1, 2), col = c("green", "red", "blue", "black"))
+
+# g) Only 2 back fitting iteration was required 
+
+
+```
+
 
 

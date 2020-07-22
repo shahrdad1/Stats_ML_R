@@ -136,20 +136,6 @@ noOfFeatures <- ncol(hitters.df) -1
 cv.errors <- matrix(NA, k, noOfFeatures, 
                     dimnames = list(NULL, paste(1:noOfFeatures)))
 
-# Here is cv.errors:
-# ====================
-#       1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19
-#  [1,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
-#  [2,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
-#  [3,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
-#  [4,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
-#  [5,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
-#  [6,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
-#  [7,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
-#  [8,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
-#  [9,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
-# [10,] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
-
 # perform a cross validation on a for loop
 for (j in 1:k){
   # step# 2 of algorithm is evaluated on all folds except one of them each time
@@ -187,11 +173,13 @@ for (l in 1:ncol(cv.errors)){
 }
 
 # find the minimum of all cv-MSE means and corresponding coefficients
-print("minimum of all cv-MSE means and corresponding coefficients: ")
-which.min(cv.error.means)
+print("No of selected Features is the one with minimum of all cv-MSE means: ")
+(no.of.selected.features <- which.min(cv.error.means))
 
-# seems like model with following 10 predictors has least MSE error on test data
-names(coef(best.fit, id = which.min(cv.error.means)))
+# finally get the slected columns (remeber it includes (Intercept) that has to be removed)
+reg.best <- regsubsets(Salary ~ ., data = hitters.df, 
+                         nvmax = no.of.selected.features)
+names(coef(best.fit, id = which.min(cv.error.means))) 
 
 ```
 
@@ -292,10 +280,13 @@ for (i in 1:ncol(cv.errors)){
 
 # find the minimum of all cv-MSE means and corresponding coefficients
 print("minimum of all cv-MSE means and corresponding coefficients: ")
-which.min(cv.error.means)
+(selected.no.of.features <- which.min(cv.error.means))
+
+lda.best <- regsubsets(Direction ~ ., data = weekly.df[folds != j, ], 
+                         nvmax = selected.no.of.features, method = "backward")
 
 # seems like model with following 5 predictors has least MSE error on test data
-names(coef(best.fit, id = which.min(cv.error.means) ))
+names(coef(lda.best, id = which.min(cv.error.means) ))
 
 ```
 
@@ -973,12 +964,12 @@ for (i in 2 : length(results)){
 (allMse <- (allResults %>%
   group_by(no.of.coefs) %>%
   summarise(mse.mean = mean(MSE))) )
-(idx <- which.min(allMse$mse.mean))
+(noOfFeatures <- which.min(allMse$mse.mean))
 print ("The best subset of features selected correspnd to minimum CV_MSE")
 # train on the whole training set now
 
 regfit.full.train <- regsubsets(y ~ ., df , nvmax = ncol(df %>% select (-y)))
-coef(regfit.full.train, id = idx)
+coef(regfit.full.train, id = noOfFeatures)
 
 #- -------------------------------------------------------------------------
 print ("part d : Use forward stepwise selection to find the best selected subsets  ------------------" )
@@ -1058,12 +1049,12 @@ for (i in 2 : length(results)){
 (allMse <- (allResults %>%
   group_by(no.of.coefs) %>%
   summarise(mse.mean = mean(MSE))) )
-(idx <- which.min(allMse$mse.mean))
+(no.of.selected.features <- which.min(allMse$mse.mean))
 print ("The forward features selected correspnd to minimum CV_MSE")
 # train on the whole training set now
 regfit.fwd.train <- regsubsets(y ~ ., df , nvmax = ncol(df %>% select (-y)),
                                method = "forward")
-coef(regfit.fwd.train, id = idx)
+coef(regfit.fwd.train, id = no.of.selected.features)
 
 
 #----------------------------------------------------------------------------
@@ -1181,11 +1172,11 @@ for (i in 2 : length(results)){
 (allMse <- (allResults %>%
   group_by(no.of.coefs) %>%
   summarise(mse.mean = mean(MSE))) )
-(idx <- which.min(allMse$mse.mean))
+(no.of.selected.features <- which.min(allMse$mse.mean))
 print ("The best subset of features selected correspnd to minimum CV_MSE")
 # train on the whole training set now
 regfit.full.train <- regsubsets(y ~ ., df, nvmax = ncol(df %>% select (-y)))
-coef(regfit.full.train, id = idx)
+coef(regfit.full.train, id = no.of.selected.features)
 
 print(" Clearly applying CV on Best subset selection provides nonsensical result.")
 
