@@ -1250,6 +1250,7 @@ arrange(flights, distance)[1,]
 arrange(flights, desc(distance))[1,]
 
 ```
+
 ```{r Select columns }
 library(nycflights13)
 library(tidyverse)
@@ -1484,6 +1485,7 @@ batters %>%
 batters %>%
   arrange(desc(ba))
 ```
+
 ```{r Summary functions: mean(), n(), sum(), median(), sd(), IQR(), mad()}
 # sum(x > 10) can take a logical expression that filters in certain records and then it adds them (sum of bunch of T and F values)
 # mean (x > 60) can filters in records whose column 'x' value is greater than 60 and  then calculate the mean of x for filtered records
@@ -1716,6 +1718,8 @@ data %>%
   ungroup() %>% 
   arrange(desc(n))
 ```
+
+
 ```{r group_by with mutate() and filter()}
 library(nycflights13)
 library(tidyverse)
@@ -1744,6 +1748,8 @@ poular_dests %>%
 
 
 ```
+
+
 ```{r Exercises 5.7.1}
 # 1) 
 # Filter function is appalied to each group and shrinks the elements of each group 
@@ -1877,6 +1883,494 @@ bijections <- whichAreBijection(dataSet = test.df, verbose = TRUE)
 # Make sure that train and test sets have the same shape:
 X_test <- sameShape(test.df, referenceSet = test.df, verbose = TRUE)
 ```
+```{r Dealing with missing values, imputate}
+suppressWarnings(suppressMessages(library(tidyverse)))
+library(tidyverse)
+
+# First let's build some data with NA
+df <- tibble(x = c(rnorm(1000), c(NA, 13.34,2673.1,4674,NA,4585.2,78.678,NA,2754,
+                   NA, 16.34,2473.1,4854,NA,45.2,7468.8,NA,2534,
+                   NA, 156.34,23.188,6744,NA,4576.2,748.478,NA,4724)), 
+             y = c(as.character(rnorm(1000)) ,
+                   c("a1df",NA,"t4grf", "sv7",NA, "0wdfwf", "13wdf", "e45rgg", "r546gbn",
+                   "ad2f",NA,"tg5rf", "s8v",NA, "wd11fwf", "wd46f", "er57gg", "rgb67n",
+                   "adf3",NA,"tgrf6", "9sv",NA, "wdfw13f", "wd17f", "ergg68", "rgb85n")))
+
+
+print(object.size(df), units="KB")
+
+
+# ------------------ select observation with missing values ------------------
+
+na.idx <- which(df %>%
+                  pmap(~c(...) %>% 
+                         reduce(~.x || is.na(.y) , .init = F)) 
+  == T)
+
+# missing values
+df[na.idx, ]
+  
+
+# ------------------ ratio of missing values ------------------
+ratio.missing <- length(na.idx) / nrow(df)
+print(glue::glue(round(ratio.missing * 100, 3), "%"))
+
+
+
+# ------------------ which features are missing most often ------------------
+df %>%
+  # Gather columns into key-value pairs
+  gather(col.name, col.value, x:y)%>%
+  group_by(col.name) %>%
+  summarise(NA.count = sum(is.na(col.value)))
+
+# another way to do this:
+df %>%
+  pmap(~c(...)) %>%
+  reduce(~.x + is.na(.y), .init = 0)
+
+# old fashion way : 
+apply(df, 2, function(x) length(which(is.na(x))))
+
+
+
+# -------------- multiple features missing in one observation ------------------
+df %>%
+  pmap(~c(...) %>%
+         reduce(~.x + is.na(.y) , .init = 0))
+         
+# old fashio way:
+apply(df, 1, function(x) length(which(is.na(x))))
+
+
+
+
+# ----------------- Use imputation to predict values for NAs ------------------
+# Use predictive models using the known features in order to estimates the missing features.
+# When imputing values, it is important that the test data are not used 
+library(Hmisc)
+
+# use aregImpute for multiple imputation
+imputed <- aregImpute(y ~ x, df, group=df$y , pr = FALSE)
+
+# Note that aregImpute makes several multiple imputations with different bootstrap samples, 
+# which can be specified using the n.impute parameter. Since we want to use the imputations 
+# from all runs rather than a single one, we will use the fit.mult.impute function to define our model:
+
+
+# list.out: return a list; imputation: arbitrarily use the first imputation
+imputed.data <- as.data.frame(impute.transcan(imputed, data = df,
+                imputation = 1, list.out = TRUE,  pr = FALSE))
+
+# compute new weights
+weights <- get.weights(imputed.data)
+
+# use imputations from all iterations rather than an arbitrary iteration:
+fmi <- fit.mult.impute(y ~ x,
+        fitter=glm, xtrans = imputed, family = "poisson", 
+        data = df, subset = trainset, pr = FALSE) #, weights = weights)
+        # weights arguments (weights = weights) not used due to error:
+        # "..2 used in an incorrect context, no ... to look in"
+fmi.preds <- predict.glm(fmi, newdata = df[testset,], type = "response") 
+plot.linear.model(fmi, fmi.preds, df$y[testset])
+
+# inspect imputed observations with respect to the outcome 
+summary(as.numeric(imputed.data$df))
+
+
+```
+```{r}
+# -------------  density: computes kernel density estimates. -------------
+require(graphics)
+
+plot(density(c(-20, rep(0,98), 20)), xlim = c(-4, 4))  # IQR = 0
+
+# The Old Faithful geyser data
+d <- density(faithful$eruptions, bw = "sj")
+
+plot(d)
+
+plot(d, type = "n")
+polygon(d, col = "wheat")
+```
+
+
+```{r regression model analysis and diagnostics}
+library(tidyverse)
+library(graphics)
+
+# make up some data
+# ------------- 
+carseats.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Carseats.csv", 
+                      header=T, stringsAsFactors = T, na.strings = "?")
+str(carseats.df)
+
+carseats.df <- subset(na.omit(carseats.df), 
+        select = c("Sales", "CompPrice", "Income", "Price"))
+
+str(carseats.df)
+set.seed(1113)
+
+plot(carseats.df)
+
+(no.of.train <- ceiling(0.7 * nrow(carseats.df)))
+(no.of.test <- nrow(carseats.df) - no.of.train)
+
+train.idx <- sample(seq_len(nrow(carseats.df)), no.of.train)
+test.idx <- setdiff(seq_len(nrow(carseats.df)), train.idx)
+
+# build ordinary least square model
+model <- lm(Sales ~ CompPrice + Income + +Price ,
+            data = carseats.df , subset = train.idx)
+
+# first thing to do is to get confedence interval for each coefficient
+# The wider confedence interval means model is more hesitate about the coefficient
+confint(model)
+
+# point to note: confedence interval for Income is too wide comparing with othres
+# See model's performance
+
+pred.values <- predict(model, newdata = carseats.df[test.idx, ])
+obs.values <- carseats.df[test.idx, ]$Sales
+
+# find the R^2 for test data
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+
+# R squared is 0.411 which is not great!
+# lets plot residuals:
+
+plot.data <- data.frame("Pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# From the plot we see that:
+#  Salaries <= 4 are over estimated
+#  Salaries >= 15 are under estimated
+
+#let's see wht similar plot showson traing data
+
+pred.values.train <- model$fitted.values
+obs.values.train <- model$model[,1]
+
+plot.data.train <- data.frame("Pred.values" = pred.values.train, "obs.values" = obs.values.train, 
+                                "DataSet" = "train")
+residuals.train <- obs.values.train - pred.values.train
+
+plot.residuals.train <- data.frame("x" = obs.values.train, "y" = pred.values.train, 
+                "x1" = obs.values.train, "y2" = pred.values.train + residuals.train,
+                "DataSet" = "train")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data.train, 
+            aes(x = obs.values.train, y = pred.values.train, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals.train, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# looking at the above obcerved vs. predicted values in training data shows
+# majority of obdevrd data has salary between 4 to 12 thus in this range 
+# standard error is lower.
+
+# let's draw the residuals pdf:
+plot(density(model$residuals))
+
+# Residuals are not normally distributed , so linear model is not the best model.
+# let's look at diagnodtics plot to see the outliers and high leverage points
+plot(model)
+
+# Let's have look at the portions of full data that under estimations and over estimation occured
+
+# observed data that is a border between salaries < 4.xxx and salaries > 4.xxx
+(left.cut <- quantile(carseats.df$Sales , 0.15))
+
+# observed data that is a border between salaries > 12.xxx and salaries < 10.xxx
+(right.cut <- quantile(carseats.df$Sales , 0.95))
+
+# observed dat with salaries < 4.xxx 
+left.side.data.idx <- which(carseats.df$Sales < left.cut)
+
+# summary of data in under estimated region
+summary(carseats.df[left.side.data.idx, ])
+
+# observed dat with salaries > 10.xxx 
+right.side.data.idx <- which(carseats.df$Sales > right.cut)
+
+# summary of data in over estimated region
+summary(carseats.df[right.side.data.idx, ])
+
+# summary of whole data
+summary(carseats.df)
+
+# comparing the mean of corresponding predictors of low (high) sale observations
+# with other observations shows they are not large difference between
+# means of predictors of low (high) sale observations and other observations
+# So this could not be the cause of under and over estimation.
+# looking at the plots shows majaority of records have Sales value 
+# larger than 4 which makes model to choose intercept around 3.9
+
+
+# ---------------- Dealing with under and over estimation -----------------
+
+# To reduce under estimate and over estimated values let's 
+# use GLM to be able to plugin Poisson pdf, we chose poisson 
+# because plot of residuals showd it looks more poisson than Normal:
+
+# GLM with Poisson does not use ordinary least square to fit the data
+pois.model <- glm(Sales ~ CompPrice + Income + Price ,
+            family = "poisson" ,data = carseats.df , subset = train.idx)
+
+# first thing to do is to get confedence interval for each coefficient
+# The wider confedence interval means model is more hesitate about coefficient
+confint(pois.model)
+
+# point to note: confedence interval of GLM for Comprice is too wide comparing with othres
+# See model's performance
+# need to set type to 'response' to get exponentiated predictions 
+pred.values <- predict(pois.model, newdata = carseats.df[test.idx, ], 
+                      type = "response") 
+obs.values <- carseats.df[test.idx, ]$Sales
+
+# find the R^2 for test data
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+
+# R squared is 0.426 which is slightly improved
+# lets plot residuals:
+
+plot.data <- data.frame("Pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# ------------------------------------------------------------------------------
+# -------- Adjust the loss function by increasing impact of residulas ----------
+# ------------------------------------------------------------------------------
+# To rectify underestimation of Sales we adjust the loss function:
+# We increase the impact of the residuals of the outliers by calculating 
+# the z-scores of the sales and then use their exponential as the weight 
+# for the regression model
+
+sales.z.scores <- (carseats.df$Sales - mean(carseats.df$Sales)) / sd(carseats.df$Sales)
+weights.exp <- 1/exp(sales.z.scores)^2
+sales.weights <- weights.exp / mean(weights.exp) # normalize to mean 1
+
+# Now build a new GLM model with weights
+pois.model.with.weights  <- glm(Sales ~ CompPrice + Income + Price ,
+            family = "poisson" ,data = carseats.df , subset = train.idx, 
+            weights = sales.weights)
+
+#Let's see the p-values
+coef(summary(neg.bin.model.with.weights))
+# p-values shows all predictors are statistically significant
+
+
+# get confedence interval for each coefficient
+confint(pois.model.with.weights)
+
+# Clearly cofedence intervals of the predictor looks better now : No wide range is seen
+
+# See model's performance
+# need to set type to 'response' to get exponentiated predictions 
+pred.values <- predict(pois.model.with.weights, newdata = carseats.df[test.idx, ], 
+                      type = "response")
+obs.values <- carseats.df[test.idx, ]$Sales
+
+# find the R^2 for test data
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+
+# R squared is 0.425 which is back to what is was
+# lets plot residuals:
+
+plot.data <- data.frame("Pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# Remember we assumed that the mean of DV should be equal to its variance 
+# to be able to use Poisson regression
+# let's see ho is this true
+
+sales.mean <- round(mean(carseats.df$Sales) ,3)
+sales.var <- round(var(carseats.df$Sales),3)
+print(glue::glue("mean of Sales: ",sales.mean, 
+                 "\n variance of Sales: ",  sales.var))
+
+# Variance is greater than the mean we have slight over dispersion
+# we should try picking a model that is more suitable for overdispersion such as
+# negative binomial
+
+library(MASS)
+
+neg.bin.model.with.weights  <- glm.nb(Sales ~ CompPrice + Income + Price ,
+                                   data = carseats.df , subset = train.idx, 
+                                   weights = sales.weights)
+
+pred.values <- predict(neg.bin.model.with.weights, newdata = carseats.df[test.idx, ], 
+                      type = "response")
+obs.values <- carseats.df[test.idx, ]$Sales
+
+#Let's see the p-values
+coef(summary(neg.bin.model.with.weights))
+# p-values shows all predictors are statistically significant
+
+# get confedence interval for each coefficient
+confint(pois.model.with.weights)
+
+
+# See how model performs
+# need to set type to 'response' to get exponentiated predictions 
+pred.values <- predict(pois.model.with.weights, newdata = carseats.df[test.idx, ], 
+                      type = "response")
+obs.values <- carseats.df[test.idx, ]$Sales
+
+# find the R^2 for test data
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+
+# R squared is 0.425 which is back to what is was
+# lets plot residuals:
+
+plot.data <- data.frame("Pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+
+# confidence bands for a negative binomial can be found in the following way:
+
+# predict on the link level, which is more Gaussian:
+preds.nb.ci <- predict(neg.bin.model.with.weights, 
+                       newdata = carseats.df[test.idx, ], 
+                       type = "link", se.fit = TRUE)
+
+# compute confidence intervals
+ilink <- family(neg.bin.model.with.weights)$linkinv # exponential
+
+## parameters of the negative binomial
+theta <- neg.bin.model.with.weights$theta # 'r' parameter of negative binomial (nbr of successes)
+
+mu <- preds.nb.ci$fit # mean of negative binomial varies per fitted point
+
+p <- theta / (theta + mu) # probability of success parametrization of negative binomial
+
+
+# find 95% CI for normal distribution
+# (we're not taking these values from the negative binomial because SEs are for normal distribution)
+
+# ci.factor <- qnbinom(1 - (1 - CI.int)/2, size = theta, 
+#                      mu = as.numeric(preds.nb.ci$fit)) # different factors per observation
+
+ci.factor <- 1.96
+CI.int <- 0.95
+
+# calculate CIs:
+df <- data.frame(carseats.df[test.idx, ], 
+                 "PredictedSalary" = ilink(preds.nb.ci$fit), 
+                 "Lower" = ilink(preds.nb.ci$fit - ci.factor * preds.nb.ci$se.fit),
+                "Upper" = ilink(preds.nb.ci$fit + ci.factor * preds.nb.ci$se.fit))
+
+df
+# Using the constructed data frame containing the values of the features in the test set as well as the predictions with their confidence bands, we can plot how the estimates fluctuate in dependence on the independent variables:
+
+# plot estimates vs individual features in the test set
+plots <- list()
+for (feature in colnames(carseats.df)) {
+    if (feature == "Sales") {
+        next
+    }
+    p <- ggplot(df, aes_string(x = feature, 
+                       y = "PredictedSalary")) + 
+      geom_line(colour = "blue") + 
+      geom_point() + 
+      geom_ribbon(aes(ymin = Lower, ymax = Upper), 
+                    alpha = 0.5) 
+      plots[[feature]] <- p
+}
+library(gridExtra)
+grid.arrange(plots[[1]], plots[[2]], plots[[3]])
+
+# These graphs shows high confedence when predicted salary is between 10 and 30
+```
+
+
+```{r function plot}
+
+fun1 <- function(teta) {1 + sin(teta)}
+p <- ggplot(tibble(teta = 0:2*pi), aes(x = teta)) + stat_function(fun = fun1)
+p
+
+
+fun2 <- function(teta){cos(2*teta)}
+df <- tibble(teta=0:2*pi)
+ggplot(df, aes(x = teta)) + stat_function(fun = fun2)
+#----------- polar coordinate if you know how to transform polar equation into cartesian---------------
+
+df <- tibble(r = seq(0, 2, length = 50), teta = seq(0, 2*pi, length = 50))
+transformed <- transform(df,
+  x = r * sin(teta),
+  y = r * cos(teta)
+)
+
+ggplot(transformed, aes(x, y)) + 
+  geom_path() + 
+  geom_point(size = 2, colour = "red") + 
+  coord_fixed()
+
+```
 
 * References :
     + Advanced R second edition by Hadley Wickham
@@ -1886,3 +2380,4 @@ X_test <- sameShape(test.df, referenceSet = test.df, verbose = TRUE)
     + https://suzanbaert.netlify.app/2018/01/dplyr-tutorial-3/
     + https://suzanbaert.netlify.app/2018/01/dplyr-tutorial-4/
     + https://cran.r-project.org/web/packages/dataPreparation/vignettes/train_test_prep.html
+    + https://www.datascienceblog.net/post/machine-learning/improving_ozone_prediction/
