@@ -1,8 +1,10 @@
 ---
 title: "ISLR CH7 Exercises"
 output:
-  pdf_document: default
+  html_document:
+    df_print: paged
   html_notebook: default
+  pdf_document: default
 ---
 
 ```{r apply lapply and sapply}
@@ -511,59 +513,47 @@ ggplot(tibble(x=preds), aes(x = x)) +
 # calculate test.mse
 threshold = 0.5
 gam.pred <- ifelse(gam.probs > threshold, "Up", "Down")
-
-missclassificationRate = NULL
-nullClassificationRate = NULL
-FP_rates = NULL
-TP_rates = NULL
-precisions = NULL
-specificities = NULL
-confusionTables = NULL
-aucs = NULL
+gam.obs <- smarket.df[test,]$Direction
 
 library(pROC)
-df <- smarket.df[test,]
 
-confusion_table <- table(gam.pred, smarket.df[test,]$Direction)
+confusion_table <- table(gam.pred, gam.obs)
   
 nullClassifier <- max(
     (confusion_table[1,1] + confusion_table[2,1])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ), 
     (confusion_table[1,2] + confusion_table[2,2])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ))
-  
-nullClassificationRate <- c(nullClassificationRate, nullClassifier)
-roc_obj <- roc(df$Direction, purrr::flatten_dbl(gam.probs))
+
+roc_obj <- roc(gam.obs, purrr::flatten_dbl(gam.probs))
 
 # Let's draw some AUC plots
 plot(roc_obj, legacy.axes = TRUE)
 
-aucs <- c(aucs, auc(roc_obj))
-
-missclassificationRate <- c(missclassificationRate, mean(gam.pred != smarket.df[test,]$Direction))
-FP_rates <- c(FP_rates, confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]))
-TP_rates <- c(TP_rates, confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2]))
-precisions <- c(precisions, confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1]))
-specificities <- c(specificities , 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]) )
+missclassificationRate <- mean(gam.pred != gam.obs)
+FP_rates <- confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
+TP_rates <- confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2])
+precisions <- confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1])
+specificities <- 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
 
 # overall fraction of wrong predictions:
 # print(confusion_table)
 
 # average missclassification error rate
-sprintf("GAM classifier : Missclassification error rate : %s", mean(missclassificationRate))
+sprintf("GAM classifier : Missclassification test error rate : %s", missclassificationRate)
 
-sprintf("GAM classifier : Null Classifier: %s", mean(nullClassificationRate))
+sprintf("GAM classifier : Null Classifier: %s", nullClassifier)
 
-sprintf("GAM classifier AUC: %s", mean (aucs))
+sprintf("GAM classifier AUC: %s", auc(roc_obj))
 # FP rate:
-sprintf("GAM classifier : FP rate (TypeI error, 1 - specificity) : %s", mean(FP_rates))
+sprintf("GAM classifier : FP rate (TypeI error, 1 - specificity) : %s", FP_rates)
 
 # TP rate:
-sprintf("GAM classifier : TP rate (1-TypeII error, power, sensetivity, recall) : %s", mean(TP_rates))
+sprintf("GAM classifier : TP rate (1-TypeII error, power, sensetivity, recall) : %s", TP_rates)
 
 # precision:
-sprintf("GAM classifier : precision: %s", mean(precisions))
+sprintf("GAM classifier : precision: %s", precisions)
 
 # specificity 1-FP/N:
-sprintf("GAM classifier : specificity 1-FP/N: %s", mean(specificities))
+sprintf("GAM classifier : specificity 1-FP/N: %s", specificities)
 
 
 ```
@@ -632,7 +622,7 @@ wage.df = tibble(wage.df)
 remove.empty.characters <- function(df) 
   df %>%
     select_all %>%
-    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+    filter_if(is.character, all_vars(!is.na(.) & trimws(.) != ""))
 
 # Next remove leading and trailing spaces from all elements in character columns
 trim.f <- function(col, na.rm = F) { 
@@ -745,7 +735,7 @@ wage.df = tibble(wage.df)
 remove.empty.characters <- function(df) 
   df %>%
     select_all %>%
-    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+    filter_if(is.character, all_vars(!is.na(.) & trimws(.) != ""))
 
 # Next remove leading and trailing spaces from all elements in character columns
 trim.f <- function(col, na.rm = F) { 
@@ -845,7 +835,7 @@ wage.df = tibble(wage.df)
 remove.empty.characters <- function(df) 
   df %>%
     select_all %>%
-    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+    filter_if(is.character, all_vars(!is.na(.) & trimws(.) != ""))
 
 # Next remove leading and trailing spaces from all elements in character columns
 trim.f <- function(col, na.rm = F) { 
@@ -944,7 +934,7 @@ auto.df = tibble(auto.df)
 remove.empty.characters <- function(df) 
   df %>%
     select_all %>%
-    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+    filter_if(is.character, all_vars(!is.na(.) & trimws(.) != ""))
 
 # Next remove leading and trailing spaces from all elements in character columns
 trim.f <- function(col, na.rm = F) { 
@@ -1279,7 +1269,7 @@ library(mgcv)
 remove.empty.characters <- function(df) 
   df %>%
     select_all %>%
-    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+    filter_if(is.character, all_vars(!is.na(.) & trimws(.) != ""))
 
 # Next remove leading and trailing spaces from all elements in character columns
 trim.f <- function(col, na.rm = F) { 

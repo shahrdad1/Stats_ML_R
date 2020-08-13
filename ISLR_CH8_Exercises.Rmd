@@ -1,0 +1,1531 @@
+---
+title: "ISLR CH8 Exercises"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+\usepackage{amsthm}
+
+```{r classification tree}
+library(tidyverse)
+library(tree)
+options(warn = 1)
+set.seed(1)
+carseats.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Carseats.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+
+carseats.df <- tibble(carseats.df)
+
+
+# find NAs
+
+carseats.df %>% 
+   filter_all(all_vars(is.na(.)))
+
+# convert all character columns to factor
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+carseats.df <- char.to.fctor(carseats.df)
+
+# Add new column High as label for all records
+carseats.df$High <- ifelse(carseats.df$Sales <= 8, "No", "Yes")
+
+# convert High column into factor
+carseats.df$High <- ordered(carseats.df$High, levels = c("Yes","No"))
+str(carseats.df)
+
+# construct a classification tree on data 
+tree.carseats <- tree(High ~ .-Sales, carseats.df)
+
+summary(tree.carseats)
+
+plot(tree.carseats)
+text(tree.carseats, pretty=0)
+
+tree.carseats
+
+```
+
+Tree Deviance is defined as :$-2\sum_{m=1}^\overline{T_{0}} \sum_{k=1}^K n_{m,k} \ln \widehat{p}_{m,k}$
+
+Residual mean devince is:
+$\frac{-2\sum_{m=1}^\overline{T_{0}} \sum_{k=1}^K n_{m,k} \ln \widehat{p}_{m,k}}{N - |T_{0}|}$
+
+Where N is Number of observations.
+
+Note that values for each branch are as follows:
+
+ShelveLoc: Good $(split\,criterion)$ 85 $(No\,of\,observation\,in\,the\,branch)$ 90.330 $(deviance)$ Yes $(overall\,prediction\,for\,the\,branch)$ (0.77647 0.22353 )  $(fractions\,of\,observation\, classifications\,for\,the\,branch)$
+```{r Calculate test error for above classification tree}
+
+library(tidyverse)
+library(tree)
+options(warn = 1)
+set.seed(1)
+carseats.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Carseats.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+
+carseats.df <- tibble(carseats.df)
+
+
+# find NAs
+
+carseats.df %>% 
+   filter_all(all_vars(is.na(.))) 
+
+# convert all character columns to factor
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+carseats.df <- char.to.fctor(carseats.df)
+
+# Add new column High as label for all records
+carseats.df$High <- ifelse(carseats.df$Sales <= 8, "No", "Yes")
+
+# convert High column into factor
+carseats.df$High <- factor(carseats.df$High, levels = c("Yes","No"))
+
+set.seed(1113)
+
+no.of.train <- ceiling(0.7 * nrow(carseats.df))
+no.of.test <- nrow(carseats.df) - no.of.train
+
+train.idx <- sample(seq_len(nrow(carseats.df)), no.of.train)
+test.idx <- setdiff(seq_len(nrow(carseats.df)), train.idx)
+
+# build classification tree on train data
+tree.carseats <- tree(High ~ .-Sales, carseats.df[train.idx,])
+
+plot(tree.carseats)
+text(tree.carseats, pretty = 0)
+# do the predoiction on test data (type="class" makes R return class predictions):
+pred.probs <- predict(tree.carseats,carseats.df[test.idx,])
+tree.pred <- predict(tree.carseats, carseats.df[test.idx,], type = "class")
+
+# see the confusion matrix
+library(pROC)
+(confusion_table <- table(tree.pred, carseats.df[test.idx,]$High))
+
+nullClassifier <- max(
+    (confusion_table[1,1] + confusion_table[2,1])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ), 
+    (confusion_table[1,2] + confusion_table[2,2])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ))
+  
+roc_obj <- roc(unlist(carseats.df[test.idx,]$High), pred.probs[, 1])
+
+# Let's draw some AUC plots
+plot(roc_obj, legacy.axes = TRUE)
+
+
+missclassificationRate <- mean(tree.pred != carseats.df[test.idx,]$High)
+FP_rates <- confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
+TP_rates <- confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2])
+precisions <- confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1])
+specificities <-  1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]) 
+classification.rate <- (confusion_table[2,2] + confusion_table[1,1]) / 
+  (confusion_table[1,1]+ confusion_table[1,2] + confusion_table[2,1]+ confusion_table[2,2])
+# overall fraction of wrong predictions:
+# print(confusion_table)
+
+sprintf("Null Classifier error rate : %s", 1 - nullClassifier)
+
+# average missclassification error rate
+sprintf("tree classifier : Missclassification error rate : %s", missclassificationRate)
+
+# FP rate:
+sprintf("tree classifier : FP rate (TypeI error, 1 - specificity) : %s", FP_rates)
+
+# tree classification 
+print(glue::glue("Tree classification rate: ", classification.rate))
+
+# Null classifier rate
+sprintf("Null Classifier rate: %s", nullClassifier)
+
+# TP rate:
+sprintf("tree classifier : TP rate (1-TypeII error, power, sensetivity, recall) : %s", TP_rates)
+
+# precision:
+sprintf("tree classifier : precision: %s", precisions)
+
+# specificity 1-FP/N:
+sprintf("tree classifier : specificity 1-FP/N: %s", specificities)
+
+# -----------------------------------------------------------------------------
+# ---------- Lets prune the tree to see if we get better results ---------------
+cv.carseats <- cv.tree(object = tree.carseats, FUN = prune.misclass, K = 10)
+
+# Number of terminal nodes of each tree that CV considered
+cv.carseats$size
+
+# Error rate corresponding to each tree that CV considered
+cv.carseats$dev
+
+# value of cost complexity parameter alpha that corresponds to each tree considered by CV
+cv.carseats$k
+
+# plot the missclassification error rate as the function of size and k 
+plot(cv.carseats$size, cv.carseats$dev, type = 'b')
+plot(cv.carseats$k, cv.carseats$dev, type = 'b')
+
+# seems like 9 is the best size of the tree, let's prune it to get to tree with size 9
+prune.carseats <- prune.misclass(tree.carseats, best = 9)
+
+#original data
+str(carseats.df)
+
+#pruned tree
+summary(prune.carseats)
+
+plot(prune.carseats)
+text(prune.carseats, pretty = 0)
+# let's run it on test set to see the ,iss classification rate again:
+
+
+# do the predoiction on test data (type="class" makes R return class predictions):
+pred.probs <- predict(prune.carseats,carseats.df[test.idx,])
+tree.pred <- predict(prune.carseats, carseats.df[test.idx,], type = "class")
+
+# see the confusion matrix
+library(pROC)
+(confusion_table <- table(tree.pred, carseats.df[test.idx,]$High))
+
+nullClassifier <- max(
+    (confusion_table[1,1] + confusion_table[2,1])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ), 
+    (confusion_table[1,2] + confusion_table[2,2])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ))
+  
+roc_obj <- roc(unlist(carseats.df[test.idx,]$High), pred.probs[, 1])
+
+# Let's draw some AUC plots
+plot(roc_obj, legacy.axes = TRUE)
+
+
+missclassificationRate <- mean(tree.pred != carseats.df[test.idx,]$High)
+FP_rates <- confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
+TP_rates <- confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2])
+precisions <- confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1])
+specificities <-  1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1]) 
+classification.rate <- (confusion_table[2,2] + confusion_table[1,1]) / 
+  (confusion_table[1,1]+ confusion_table[1,2] + confusion_table[2,1]+ confusion_table[2,2])
+# overall fraction of wrong predictions:
+# print(confusion_table)
+
+
+sprintf("Null Classifier error rate : %s", 1 - nullClassifier)
+
+# average missclassification error rate
+sprintf("tree classifier : Missclassification error rate : %s", missclassificationRate)
+
+# FP rate:
+sprintf("tree classifier : FP rate (TypeI error, 1 - specificity) : %s", FP_rates)
+
+# tree classification 
+print(glue::glue("Tree classification rate: ", classification.rate))
+
+# Null classifier rate
+sprintf("Null Classifier: %s", nullClassifier)
+
+# TP rate:
+sprintf("tree classifier : TP rate (1-TypeII error, power, sensetivity, recall) : %s", TP_rates)
+
+# precision:
+sprintf("tree classifier : precision: %s", precisions)
+
+# specificity 1-FP/N:
+sprintf("tree classifier : specificity 1-FP/N: %s", specificities)
+
+```
+
+
+Remember to each given value of $\alpha$  (k in R) we assign a subtree $T_{\alpha}$ as below:  
+Using \space Gini \space index:  
+$T_{\alpha} = \underset{T \subset T_{0}}{\operatorname{argMin}} \{\sum\limits_{i=1}^{|T|} \sum\limits_{k=1}^{K} \hat{p_{m,k}} \cdot (1 -  \hat{p_{m,k})} + \alpha \cdot |T| \space\space | T \subset T_{0} \}$
+
+or \space using  \space Cross  \space Entropy:  
+
+$T_{\alpha} = \underset{T \subset T_{0}}{\operatorname{argMin}} \{\sum\limits_{i=1}^{|T|} \sum\limits_{k=1}^{K} \hat{-p_{m,k}} \cdot \log  (\hat{p_{m,k}}) + \alpha \cdot |T| \space\space | T \subset T_{0} \}$
+
+And then we use CV to find few good values of $\alpha$ and their corresponding $T_{\alpha}$ based on 
+miss classification error rate (FUN = prune.misclass).
+
+```{r Fit Regression tree to Boston data set}
+library(tidyverse)
+library(dataPreparation)
+library(tree)
+boston.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/BostonHousing.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+boston.df <- tibble(boston.df)
+
+# see if there is any NA in any records
+nrow(df[which(is.na(boston.df)),])
+
+# No NA anywhere , let's do usual clean up:
+
+# remove constant variables
+constant_cols <- whichAreConstant(boston.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(boston.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(boston.df))
+
+str(boston.df)
+
+set.seed(1113)
+no.of.train <- ceiling(0.7 * nrow(boston.df))
+no.of.test <- nrow(boston.df) - no.of.train
+
+train.idx <- sample(seq_len(nrow(boston.df)), no.of.train)
+test.idx <- setdiff(seq_len(nrow(boston.df)), train.idx)
+
+tree.boston <- tree(medv ~ ., boston.df, subset = train.idx)
+
+plot(tree.boston)
+text(tree.boston, pretty = 0)
+
+tree.boston
+
+# let's draw the residuals pdf, very close to standard normal
+plot(density(summary(tree.boston)$residuals))
+
+# deviance is sum of squared error for the tree
+
+# do the predoiction on test data 
+pred.values <- predict(tree.boston, newdata = boston.df[test.idx,])
+obs.values <- boston.df[test.idx,]$medv
+# find the R^2 for test data
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("Pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# plot the residuals
+plot(density(residuals))
+
+plot(pred.values, obs.values)
+abline(0,1)
+
+# tetMSE
+mean((obs.values - pred.values)^2)
+
+#---------------------------------------------------------
+# Now let's prune the tree to see if it performs better
+# --------------------------------------------------------
+cv.boston <- cv.tree(tree.boston, K = 10)
+plot(cv.boston$size, cv.boston$dev, type='b')
+
+# The deviance is lowest at 7, so let's construct a pruned tree with 7 nodes
+prune.boston <- prune.tree(tree = tree.boston, best=7)
+
+# summary of pruned tree
+summary(prune.boston)
+
+plot(prune.boston)
+text(prune.boston, pretty = 0)
+
+# let's draw the residuals pdf for pruned tree
+plot(density(summary(prune.boston)$residuals))
+
+# do the predoiction on test data 
+pred.values <- predict(prune.boston, newdata = boston.df[test.idx,])
+obs.values <- boston.df[test.idx,]$medv
+# find the R^2 for test data
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("Pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# plot the residuals
+plot(density(residuals))
+
+plot(pred.values, obs.values)
+abline(0,1)
+
+# tetMSE
+mean((obs.values - pred.values)^2)
+
+# seemed like pruning downgraded the performance of the model 
+# So pruning the tree does not add to performance
+
+# From another perspective since testMSE ~ 25 then we can infere that 
+# real house price is 5k around home value in suberb 
+```
+
+```{r bagging and random forest}
+library(tidyverse)
+library(dataPreparation)
+library(randomForest)
+boston.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/BostonHousing.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+boston.df <- tibble(boston.df)
+
+# see if there is any NA in any records
+nrow(df[which(is.na(boston.df)),])
+
+# No NA anywhere , let's do usual clean up:
+
+# remove constant variables
+constant_cols <- whichAreConstant(boston.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(boston.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(boston.df))
+
+set.seed(1113)
+no.of.train <- ceiling(0.7 * nrow(boston.df))
+no.of.test <- nrow(boston.df) - no.of.train
+
+train.idx <- sample(seq_len(nrow(boston.df)), no.of.train)
+test.idx <- setdiff(seq_len(nrow(boston.df)), train.idx)
+
+# ---------------------------- Bagging  ---------------------------
+
+# Bagging (mtry is number of predictors should be considered for each split )
+bag.boston <- randomForest(medv ~ ., data = boston.df,subset = train.idx,  
+                           mtry=ncol(boston.df)-1, importance=T)
+
+# importance of each predictor
+# % IncMSE : Increase in out of bag MSE When given predictor excluded from model 
+# IncNodePurity : Decrease on training RSS (regression) or deviance (classification) 
+#                 in each split
+importance(bag.boston)
+
+# plot importance predictors
+varImpPlot(bag.boston)
+
+# do the predoiction on test data 
+pred.values <- predict(bag.boston, newdata = boston.df[test.idx,])
+obs.values <- boston.df[test.idx,]$medv
+# find the R^2 for test data (Bagging)
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# plot the residuals
+plot(density(residuals))
+
+plot(pred.values, obs.values)
+abline(0,1)
+
+# tetMSE (Bagging)
+mean((obs.values - pred.values)^2)
+
+# ---------------------------- Bagging with 25 trees ---------------------------
+# change number of trees in bagging or random forest using ntree parameter
+
+# Bagging (mtry is number of predictors should be considered for each split )
+bag.boston.25 <- randomForest(medv ~ ., data = boston.df,subset = train.idx,  
+                           mtry=ncol(boston.df)-1, importance=T, ntree = 25)
+
+
+bag.boston.25
+
+# importance of each predictor
+# % IncMSE : Increase in out of bag MSE When given predictor excluded from model 
+# IncNodePurity : Decrease on training RSS (regression) or deviance (classification) 
+#                 in each split
+
+importance(bag.boston.25)
+
+# plot importance predictors
+varImpPlot(bag.boston.25)
+
+# do the predoiction on test data 
+pred.values <- predict(bag.boston.25, newdata = boston.df[test.idx,])
+obs.values <- boston.df[test.idx,]$medv
+# find the R^2 for test data (Bagging with 25 trees)
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# plot the residuals
+plot(density(residuals))
+
+plot(pred.values, obs.values)
+abline(0,1)
+
+# tetMSE (Bagging with 25 trees)
+mean((obs.values - pred.values)^2)
+
+
+
+# ------------------------ Random forest ---------------------------------
+# By Default :
+#   mtry = sqrt(Number of features) For classification
+#   mtry = one third of number of features For Regression
+rf.boston <- randomForest(medv ~ ., data = boston.df,subset = train.idx,  
+                           mtry=6, importance=T)
+
+
+rf.boston
+
+# importance of each predictor
+# % IncMSE : Increase in out of bag MSE When given predictor excluded from model 
+# IncNodePurity : Decrease on training RSS (regression) or deviance (classification) 
+#                 in each split
+importance(rf.boston)
+
+# plot importance predictors
+# across all of the rees considered in the random forest rm and lstat are by far 
+# most important features
+varImpPlot(rf.boston)
+
+# do the predoiction on test data 
+pred.values <- predict(rf.boston, newdata = boston.df[test.idx,])
+obs.values <- boston.df[test.idx,]$medv
+# find the R^2 for test data (Random Forest with 6 predictors)
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# plot the residuals
+plot(density(residuals))
+
+plot(pred.values, obs.values)
+abline(0,1)
+
+# tetMSE (Random Forest with 6 predictors)
+mean((obs.values - pred.values)^2)
+
+
+```
+```{r Boosting}
+library(tidyverse)
+library(dataPreparation)
+library(gbm)
+boston.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/BostonHousing.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+boston.df <- tibble(boston.df)
+
+# see if there is any NA in any records
+nrow(df[which(is.na(boston.df)),])
+
+# No NA anywhere , let's do usual clean up:
+
+# remove constant variables
+constant_cols <- whichAreConstant(boston.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(boston.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(boston.df))
+
+set.seed(1113)
+no.of.train <- ceiling(0.7 * nrow(boston.df))
+no.of.test <- nrow(boston.df) - no.of.train
+
+train.idx <- sample(seq_len(nrow(boston.df)), no.of.train)
+test.idx <- setdiff(seq_len(nrow(boston.df)), train.idx)
+
+# 5000 trees each with depth of 4, default value for shrinkage parameter is 0.001
+# lambda (Algorithm 8.2 page 322)
+boost.boston <- gbm(medv ~ ., data = boston.df[train.idx, ],
+                    distribution = "gaussian", n.trees = 5000, 
+                    interaction.depth = 4) 
+
+# rm and lstat are most important features
+summary(boost.boston)
+
+# partial dependence plots:
+# marginal affect of selected feature on response after interating out other features
+plot(boost.boston, i="rm")
+
+# median house price is decreasing with lstat
+plot(boost.boston, i="lstat")
+
+# do the predoiction on test data 
+pred.values <- predict(boost.boston, newdata = boston.df[test.idx,], n.trees = 5000)
+obs.values <- boston.df[test.idx,]$medv
+# find the R^2 for test data (Random Forest with 6 predictors)
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# plot the residuals
+plot(density(residuals))
+
+plot(pred.values, obs.values)
+abline(0,1)
+
+# tetMSE (Random Forest with 6 predictors)
+mean((obs.values - pred.values)^2)
+
+
+
+# ------------------------------------------------------------------ 
+# boosting with specefic shrinkage parameter lambda
+# ------------------------------------------------------------------
+
+# 5000 trees each with depth of 4, default value for shrinkage parameter is 0.2
+# lambda (Algorithm 8.2 page 322)
+boost.boston <- gbm(medv ~ ., data = boston.df[train.idx, ],
+                    distribution = "gaussian", n.trees = 5000, 
+                    interaction.depth = 4, shrinkage = 0.2) 
+
+# rm and lstat are most important features
+summary(boost.boston)
+
+# partial dependence plots:
+# marginal affect of selected feature on response after interating out other features
+plot(boost.boston, i="rm")
+
+# median house price is decreasing with lstat
+plot(boost.boston, i="lstat")
+
+# do the predoiction on test data 
+pred.values <- predict(boost.boston, newdata = boston.df[test.idx,], n.trees = 5000)
+obs.values <- boston.df[test.idx,]$medv
+# find the R^2 for test data (Random Forest with 6 predictors)
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# plot the residuals
+plot(density(residuals))
+
+plot(pred.values, obs.values)
+abline(0,1)
+
+# tetMSE (Random Forest with 6 predictors)
+mean((obs.values - pred.values)^2)
+
+
+```
+```{r Exercise 7}
+library(tidyverse)
+library(dataPreparation)
+library(randomForest)
+library(tree)
+boston.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/BostonHousing.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+boston.df <- tibble(boston.df)
+
+# see if there is any NA in any records
+nrow(df[which(is.na(boston.df)),])
+
+# No NA anywhere , let's do usual clean up:
+
+# remove constant variables
+constant_cols <- whichAreConstant(boston.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(boston.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(boston.df))
+
+set.seed(1113)
+no.of.train <- ceiling(0.7 * nrow(boston.df))
+no.of.test <- nrow(boston.df) - no.of.train
+
+train.idx <- sample(seq_len(nrow(boston.df)), no.of.train)
+test.idx <- setdiff(seq_len(nrow(boston.df)), train.idx)
+
+# ------------------------ Random forest ---------------------------------
+# By Default :
+#   mtry = sqrt(Number of features) For classification
+#   mtry = one third of number of features For Regression
+plot.data.trees <- tibble("No.Of.Trees" = NULL, "test.MSE" = NULL, "R^2" = NULL)
+
+for (no.of.trees in 10:100){
+  rf.boston <- randomForest(medv ~ ., data = boston.df,subset = train.idx,  
+                            n.trees = no.of.trees, importance=F)
+
+  pred.values <- predict(rf.boston, newdata = boston.df[test.idx,])
+  obs.values <- boston.df[test.idx,]$medv
+  R.squared <- round((cor(pred.values, obs.values) ^ 2), 3)
+  test.MSE <- mean((obs.values - pred.values)^2)
+
+  plot.data.trees <- rbind(plot.data.trees, 
+                           tibble("No.Of.Trees" = no.of.trees, 
+                                  "test.MSE" = test.MSE, 
+                                  "R^2" = R.squared))
+}
+
+
+ggplot() + 
+        geom_line(data = plot.data.trees, 
+            aes(x = No.Of.Trees, y = test.MSE)) + 
+  labs(title="No of trees and test MSE")
+
+# Number of trees that makes test.MSE minimim in range of 100 trees
+plot.data.trees[which.min(plot.data.trees$test.MSE), ]
+
+# --------------------------- mtry ------------------------------- #
+plot.data.mtry <- tibble("mtry" = NULL, "test.MSE" = NULL, "R^2" = NULL)
+
+for (m.try in 2:ncol(boston.df) - 1){
+  rf.boston <- randomForest(medv ~ ., data = boston.df,subset = train.idx,  
+                            mtry = m.try, importance=F)
+
+  pred.values <- predict(rf.boston, newdata = boston.df[test.idx,])
+  obs.values <- boston.df[test.idx,]$medv
+  R.squared <- round((cor(pred.values, obs.values) ^ 2), 3)
+  test.MSE <- mean((obs.values - pred.values)^2)
+
+  plot.data.mtry <- rbind(plot.data.mtry, 
+                           tibble("mtry" = m.try, 
+                                  "test.MSE" = test.MSE, 
+                                  "R^2" = R.squared))
+
+}
+
+ggplot() + 
+        geom_line(data = plot.data.mtry, 
+            aes(x = mtry, y = test.MSE)) + 
+  labs(title="mtry and test MSE")
+
+# value of mtry  that makes test.MSE minimim in range of 100 trees
+plot.data.mtry[which.min(plot.data.mtry$test.MSE), ]
+
+# over all the best result obtained for number of predictors = 4 and No of trees = 18:
+rf.boston <- randomForest(medv ~ ., data = boston.df,subset = train.idx,  
+                          mtry = 4, n.trees = 18, importance=F)
+
+pred.values <- predict(rf.boston, newdata = boston.df[test.idx,])
+obs.values <- boston.df[test.idx,]$medv
+# R sruared:
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+# testMSE:
+(test.MSE <- mean((obs.values - pred.values)^2))
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+```
+```{r r Exercise 8}
+library(tidyverse)
+library(tree)
+library(randomForest)
+options(warn = 1)
+set.seed(1)
+carseats.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Carseats.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+
+carseats.df <- tibble(carseats.df)
+
+
+# find NAs
+
+carseats.df %>% 
+   filter_all(all_vars(is.na(.))) 
+
+# convert all character columns to factor
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+carseats.df <- char.to.fctor(carseats.df)
+
+# remove constant variables
+constant_cols <- whichAreConstant(carseats.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(carseats.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(carseats.df))
+#----------------------------------------
+# a) split the data into train and test
+set.seed(1113)
+no.of.train <- ceiling(0.7 * nrow(carseats.df))
+no.of.test <- nrow(carseats.df) - no.of.train
+
+train.idx <- sample(seq_len(nrow(carseats.df)), no.of.train)
+test.idx <- setdiff(seq_len(nrow(carseats.df)), train.idx)
+
+# b) Fit a regression tree , plot the three and interpret the results, testMSE
+tree.carseats <- tree(Sales ~ ., carseats.df, subset = train.idx)
+
+plot(tree.carseats)
+text(tree.carseats, pretty = 0)
+
+# summary
+summary(tree.carseats)
+
+# the tree
+tree.carseats
+
+# let's draw the residuals pdf, very close to standard normal
+plot(density(summary(tree.carseats)$residuals))
+
+# deviance is sum of squared error for the tree
+
+# do the predoiction on test data 
+pred.values <- predict(tree.carseats, newdata = carseats.df[test.idx,])
+obs.values <- carseats.df[test.idx,]$Sales
+
+# R sruared:
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+# testMSE:
+(test.MSE <- mean((obs.values - pred.values)^2))
+
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("Pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# ----------------------------------
+# c) Let's use CV to prune th tree
+cv.carseats <- cv.tree(object = tree.carseats, FUN = prune.tree, K = 10)
+
+# Number of terminal nodes of each tree that CV considered
+cv.carseats$size
+
+# error rate corresponding to each tree that CV considered
+cv.carseats$dev
+
+# value of cost complexity parameer alpha that corresponds to each tree considered by CV
+cv.carseats$k
+
+# creata a tibble to have these values in one place
+(cv.result <- tibble(error.rate = cv.carseats$dev, tree.size = cv.carseats$size, 
+                    aplpha = cv.carseats$k)
+)
+
+cv.result[which.min(cv.result$error.rate), ]
+# plot error rate against size and k 
+plot(cv.carseats$size, cv.carseats$dev, type = 'b')
+plot(cv.carseats$k, cv.carseats$dev, type = 'b')
+
+# seems like tree with 14 terminals results in minimum cv error rate
+prune.carseats <- prune.tree(tree.carseats, best = 14)
+
+#original data
+str(carseats.df)
+
+#pruned tree
+summary(prune.carseats)
+
+plot(prune.carseats)
+text(prune.carseats, pretty = 0)
+
+# do the predoiction on test data 
+pred.values <- predict(prune.carseats, newdata = carseats.df[test.idx,])
+obs.values <- carseats.df[test.idx,]$Sales
+
+# R sruared (pruned tree):
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+# testMSE (pruned tree) :
+(test.MSE <- mean((obs.values - pred.values)^2))
+
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("Pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# pruning shows slight improvement on R squared and Test.MSE
+
+# ---------------------------------------------
+# d) Use bagging approach
+
+
+bag.carseats <- randomForest(Sales ~ ., data = carseats.df,subset = train.idx,  
+                           mtry=ncol(carseats.df)-1, importance=T)
+
+# importance of each predictor
+# % IncMSE : Increase in out of bag MSE When given predictor excluded from model 
+# IncNodePurity : Decrease on training RSS (regression) or deviance (classification) 
+#                 in each split
+importance(bag.carseats)
+
+# plot importance predictors
+varImpPlot(bag.carseats)
+
+# do the predoiction on test data 
+pred.values <- predict(bag.carseats, newdata = carseats.df[test.idx,])
+obs.values <- carseats.df[test.idx,]$Sales
+
+# R sruared (pruned tree):
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+# testMSE (pruned tree) :
+(test.MSE <- mean((obs.values - pred.values)^2))
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+# plot the residuals
+plot(density(residuals))
+
+# ---------------------------------------------
+# e) Use Random Forest
+
+
+# ------------------------ Random forest ---------------------------------
+# By Default :
+#   mtry = sqrt(Number of features) For classification
+#   mtry = one third of number of features For Regression
+
+# first let's find optimal number of trees 
+plot.data.trees <- tibble("No.Of.Trees" = NULL, "test.MSE" = NULL, "R^2" = NULL)
+
+for (no.of.trees in 10:100){
+  rf.carseats <- randomForest(Sales ~ ., data = carseats.df,subset = train.idx,  
+                            n.trees = no.of.trees, importance=F)
+
+  pred.values <- predict(rf.carseats, newdata = carseats.df[test.idx,])
+  obs.values <- carseats.df[test.idx,]$Sales
+  R.squared <- round((cor(pred.values, obs.values) ^ 2), 3)
+  test.MSE <- mean((obs.values - pred.values)^2)
+
+  plot.data.trees <- rbind(plot.data.trees, 
+                           tibble("No.Of.Trees" = no.of.trees, 
+                                  "test.MSE" = test.MSE, 
+                                  "R^2" = R.squared))
+}
+
+
+ggplot() + 
+        geom_line(data = plot.data.trees, 
+            aes(x = No.Of.Trees, y = test.MSE)) + 
+  labs(title="No of trees and test MSE")
+
+# Number of trees that makes test.MSE minimim in range of 100 trees
+plot.data.trees[which.min(plot.data.trees$test.MSE), ]
+
+
+# Let's find number of predictors to build the tree 
+# --------------------------- mtry ------------------------------- #
+plot.data.mtry <- tibble("mtry" = NULL, "test.MSE" = NULL, "R^2" = NULL)
+
+for (m.try in 2:ncol(carseats.df) - 1){
+  rf.carseats <- randomForest(Sales ~ ., data = carseats.df,subset = train.idx,  
+                            mtry = m.try, importance=F)
+
+  pred.values <- predict(rf.carseats, newdata = carseats.df[test.idx,])
+  obs.values <- carseats.df[test.idx,]$Sales
+  R.squared <- round((cor(pred.values, obs.values) ^ 2), 3)
+  test.MSE <- mean((obs.values - pred.values)^2)
+
+  plot.data.mtry <- rbind(plot.data.mtry, 
+                           tibble("mtry" = m.try, 
+                                  "test.MSE" = test.MSE, 
+                                  "R^2" = R.squared))
+
+}
+
+ggplot() + 
+        geom_line(data = plot.data.mtry, 
+            aes(x = mtry, y = test.MSE)) + 
+  labs(title="mtry and test MSE")
+
+# value of mtry  that makes test.MSE minimim in range of 100 trees
+plot.data.mtry[which.min(plot.data.mtry$test.MSE), ]
+
+
+# over all the best result obtained for number of predictors = 8 and No of trees = 33:
+rf.carseats <- randomForest(Sales ~ ., data = carseats.df,subset = train.idx,  
+                          mtry = 8, n.trees = 33, importance=F)
+
+pred.values <- predict(rf.carseats, newdata = carseats.df[test.idx,])
+obs.values <- carseats.df[test.idx,]$Sales
+# R sruared:
+(R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
+# testMSE:
+(test.MSE <- mean((obs.values - pred.values)^2))
+
+# now plot the observed vs predicted on test data
+plot.data <- data.frame("pred.values" = pred.values, "obs.values" = obs.values, 
+                                "DataSet" = "test")
+residuals <- obs.values - pred.values
+
+plot.residuals <- data.frame("x" = obs.values, "y" = pred.values, 
+                "x1" = obs.values, "y2" = pred.values + residuals,
+                "DataSet" = "test")
+
+ggplot() + 
+        # plot test samples
+        geom_point(data = plot.data, 
+            aes(x = obs.values, y = pred.values, color = DataSet)) +
+        # plot residuals
+        geom_segment(data = plot.residuals, alpha = 0.2,
+            aes(x = x, y = y, xend = x1, yend = y2, group = DataSet)) +
+        # plot optimal regressor
+        geom_abline(color = "blue", slope = 1)
+
+
+# importance: how much training RSS is decreaded (node purity increased) on each split  
+importance(rf.carseats)
+varImpPlot(rf.carseats)
+
+
+```
+```{r Exercise 9}
+
+library(tidyverse)
+library(tree)
+library(randomForest)
+library(dataPreparation)
+options(warn = 1)
+set.seed(1117)
+oj.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/orange_juice_withmissing.csv", 
+                      header=T, stringsAsFactors = F, na.strings = "?")
+
+oj.df <- tibble(oj.df)
+
+str(oj.df)
+
+#----------------------------------------
+# a) split the data into train and test
+# lets first split data to 70% train and the rest test 
+set.seed(1113)
+train.idx <- sample(1:nrow(oj.df), 0.7*nrow(oj.df))
+test.idx <- setdiff(1:nrow(oj.df), train.idx)
+
+train.df <- oj.df[train.idx, ]
+test.df <- oj.df[test.idx, ]
+
+# remove empty characters and NA helper
+remove.NA.chars <- function(df)
+  df %>%
+  select_all %>%
+  filter_if(is.character, all_vars(trimws(.) != "" & trimws(.) != "NA"))
+  
+# Finally convert character columns to factor
+
+# Clean up train data set
+train.df <- 
+  train.df %>%
+  na.omit() %>%
+  remove.NA.chars()
+
+str(train.df)
+
+# remove constant variables
+(constant_cols <- whichAreConstant(train.df))
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(train.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(train.df))
+
+# Convert characters to numeric
+train.df$PriceCH <- as.numeric(as.character(train.df$PriceCH))
+train.df$PriceMM <- as.numeric(as.character(train.df$PriceMM))
+train.df$DiscCH <- as.numeric(as.character(train.df$DiscCH))
+train.df$DiscMM <- as.numeric(as.character(train.df$DiscMM))
+train.df$SpecialCH <- as.numeric(as.character(train.df$SpecialCH))
+train.df$SpecialMM <- as.numeric(as.character(train.df$SpecialMM))
+train.df$LoyalCH <- as.numeric(as.character(train.df$LoyalCH))
+train.df$SalePriceCH <- as.numeric(as.character(train.df$SalePriceCH))
+train.df$SalePriceMM <- as.numeric(as.character(train.df$SalePriceMM))
+train.df$PriceDiff <- as.numeric(as.character(train.df$PriceDiff))
+train.df$PctDiscMM <- as.numeric(as.character(train.df$PctDiscMM))
+train.df$PctDiscCH <- as.numeric(as.character(train.df$PctDiscCH))
+train.df$StoreID <- as.numeric(as.character(train.df$StoreID))
+train.df$STORE <- as.numeric(as.character(train.df$STORE))
+
+# remove constant variables
+constant_cols <- whichAreConstant(train.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(train.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(train.df))
+train.df <- train.df[- bijections_cols]
+
+# convert all character columns to factor
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+train.df <- char.to.fctor(train.df)
+str(train.df)
+
+# --------- do similar clean up for test data ----------------
+
+# remove empty characters and NA helper
+remove.NA.chars <- function(df)
+  df %>%
+  select_all %>%
+  filter_if(is.character, all_vars(trimws(.) != "" & trimws(.) != "NA"))
+  
+# Finally convert character columns to factor
+
+# Clean up train data set
+test.df <- 
+  test.df %>%
+  na.omit() %>%
+  remove.NA.chars()
+
+str(test.df)
+
+  
+# remove constant variables
+(constant_cols <- whichAreConstant(test.df))
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(test.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(test.df))
+
+# Convert characters to numeric
+test.df$PriceCH <- as.numeric(as.character(test.df$PriceCH))
+test.df$PriceMM <- as.numeric(as.character(test.df$PriceMM))
+test.df$DiscCH <- as.numeric(as.character(test.df$DiscCH))
+test.df$DiscMM <- as.numeric(as.character(test.df$DiscMM))
+test.df$SpecialCH <- as.numeric(as.character(test.df$SpecialCH))
+test.df$SpecialMM <- as.numeric(as.character(test.df$SpecialMM))
+test.df$LoyalCH <- as.numeric(as.character(test.df$LoyalCH))
+test.df$SalePriceCH <- as.numeric(as.character(test.df$SalePriceCH))
+test.df$SalePriceMM <- as.numeric(as.character(test.df$SalePriceMM))
+test.df$PriceDiff <- as.numeric(as.character(test.df$PriceDiff))
+test.df$PctDiscMM <- as.numeric(as.character(test.df$PctDiscMM))
+test.df$PctDiscCH <- as.numeric(as.character(test.df$PctDiscCH))
+test.df$StoreID <- as.numeric(as.character(test.df$StoreID))
+test.df$STORE <- as.numeric(as.character(test.df$STORE))
+
+# remove constant variables
+constant_cols <- whichAreConstant(test.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(test.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(test.df))
+test.df <- test.df[- bijections_cols]
+
+# convert all character columns to factor
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+test.df <- char.to.fctor(test.df)
+str(test.df)
+
+
+
+
+
+# --------------------------------------------------------------------------------
+# b) Fit a classification tree , plot the three and interpret the results, testMSE
+tree.oj <- tree(Purchase ~ ., train.df)
+
+
+# Number of terminal nodes:  7 
+# Residual mean deviance:  0.7995
+# Misclassification error rate: 0.177
+summary(tree.oj)
+
+# ----------------------------------
+# c) the tree
+tree.oj
+# feature split criterion: LoyalCH < 0.0356415 
+# Number of training data observations in the branch: 44   
+# deviance : 0.00 
+# prediction for the branch : MM 
+# Fractions of observations classification for thr branch ( 0.00000 1.00000 )
+
+#d) plot the tree
+# looks the decision is mostly based on differen ranges on LoyalCH and PriceDiff
+# not much other predictors matter in decision making
+plot(tree.oj)
+text(tree.oj, pretty = 0)
+
+# --------------------------
+# e) predoiction on test data 
+# --------------------------
+threshold = 0.5
+
+pred.probs <- predict(tree.oj, newdata = test.df)
+pobs.CH <- pred.probs[,1]
+pobs.MM <- pred.probs[,2]
+
+pred.values <- ifelse(pobs.CH > threshold, "CH", "MM")
+
+obs.values <- test.df$Purchase
+
+
+library(pROC)
+
+confusion_table <- table(pred.values, obs.values)
+  
+nullClassifier <- max(
+    (confusion_table[1,1] + confusion_table[2,1])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ), 
+    (confusion_table[1,2] + confusion_table[2,2])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ))
+
+roc_obj <- roc(obs.values, pobs.CH)
+
+# Let's draw some AUC plots
+plot(roc_obj, legacy.axes = TRUE)
+
+missclassificationRate <- mean(pred.values != obs.values)
+FP_rates <- confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
+TP_rates <- confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2])
+precisions <- confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1])
+specificities <- 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
+
+# overall fraction of wrong predictions:
+# print(confusion_table)
+
+# average missclassification error rate
+sprintf("tree classifier : Missclassification test error rate : %s", missclassificationRate)
+
+sprintf("tree classifier : Null Classifier: %s", nullClassifier)
+
+sprintf("tree classifier AUC: %s", auc(roc_obj))
+# FP rate:
+sprintf("tree classifier : FP rate (TypeI error, 1 - specificity) : %s", FP_rates)
+
+# TP rate:
+sprintf("tree classifier : TP rate (1-TypeII error, power, sensetivity, recall) : %s", TP_rates)
+
+# precision:
+sprintf("tree classifier : precision: %s", precisions)
+
+# specificity 1-FP/N:
+sprintf("tree classifier : specificity 1-FP/N: %s", specificities)
+
+# ------------------------------------
+# f) apply cv.tree to prune the tree
+# ------------------------------------
+cv.oj <- cv.tree(object = tree.oj, FUN = prune.misclass, K = 10)
+
+# Number of terminal nodes of each tree that CV considered
+cv.oj$size
+
+# Error rate corresponding to each tree that CV considered
+cv.oj$dev
+
+# value of cost complexity parameter alpha that corresponds to each tree considered by CV
+cv.oj$k
+
+# -------------------------------------------------
+# g) plot tree size vs CV classification error rate
+# --------------------------------------------------
+# plot the missclassification error rate as the function of size and k 
+plot(cv.oj$size, cv.oj$dev, type = 'b')
+plot(cv.oj$k, cv.oj$dev, type = 'b')
+
+# ---------------------------------------------------------------------------------------
+# h) seems like 3 is the best size of the tree,
+# ---------------------------------------------------------------------------------------
+
+#--------------------------------------
+# i)  let's prune it to get to tree with size 3
+# ---------------------------------------------
+prune.oj <- prune.misclass(tree.oj, best = 3)
+
+
+
+plot(prune.oj)
+text(prune.oj, pretty = 0)
+# let's run it on test set to see the ,iss classification rate again:
+
+#---------------------------------------------------------------------
+# j) compare training error rates between prune and unpruned tree
+# --------------------------------------------------------------------
+
+#pruned tree
+summary(prune.oj)
+
+
+
+#---------------------------------------------------------------------
+# j) compare test error rates between prune and unpruned tree
+# --------------------------------------------------------------------
+threshold = 0.5
+
+pred.probs <- predict(prune.oj, newdata = test.df)
+pobs.CH <- pred.probs[,1]
+pobs.MM <- pred.probs[,2]
+
+pred.values <- ifelse(pobs.CH > threshold, "CH", "MM")
+
+obs.values <- test.df$Purchase
+
+library(pROC)
+
+confusion_table <- table(pred.values, obs.values)
+  
+nullClassifier <- max(
+    (confusion_table[1,1] + confusion_table[2,1])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ), 
+    (confusion_table[1,2] + confusion_table[2,2])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ))
+
+roc_obj <- roc(obs.values, pobs.CH)
+
+# Let's draw some AUC plots
+plot(roc_obj, legacy.axes = TRUE)
+
+missclassificationRate <- mean(pred.values != obs.values)
+FP_rates <- confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
+TP_rates <- confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2])
+precisions <- confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1])
+specificities <- 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
+
+# overall fraction of wrong predictions:
+# print(confusion_table)
+
+# average missclassification error rate
+sprintf("pruned tree classifier : Missclassification test error rate : %s", missclassificationRate)
+
+sprintf("pruned tree classifier : Null Classifier: %s", nullClassifier)
+
+sprintf("pruned tree classifier AUC: %s", auc(roc_obj))
+# FP rate:
+sprintf("pruned tree classifier : FP rate (TypeI error, 1 - specificity) : %s", FP_rates)
+
+# TP rate:
+sprintf("pruned tree classifier : TP rate (1-TypeII error, power, sensetivity, recall) : %s", TP_rates)
+
+# precision:
+sprintf("pruned tree classifier : precision: %s", precisions)
+
+# specificity 1-FP/N:
+sprintf("pruned tree classifier : specificity 1-FP/N: %s", specificities)
+
+#  pruned tree classifier behaves worse than the full tree:
+
+
+```
+
+```{r}
+# library("lme4")
+# library("glmmADMB")      ## (not on CRAN)
+# library("glmmTMB")
+# library("MCMCglmm")
+# library("blme")
+# library("MASS")          ## for glmmPQL (base R)
+# library("nlme")          ## for intervals(), tundra example (base R)
+# ## auxiliary
+# library("ggplot2")       ## for pretty plots generally
+# ## ggplot customization:
+# theme_set(theme_bw())
+# scale_colour_discrete <- function(...,palette="Set1") {
+#     scale_colour_brewer(...,palette=palette)
+# }
+# scale_colour_orig <- ggplot2::scale_colour_discrete
+# scale_fill_discrete <- function(...,palette="Set1") {
+#     scale_fill_brewer(...,palette=palette)
+# }
+# ## to squash facets together ...
+# zmargin <- theme(panel.spacing=grid::unit(0,"lines"))
+# library("gridExtra")     ## for grid.arrange()
+# library("broom.mixed")
+# ## n.b. as of 25 Sep 2018, need bbolker github version of dotwhisker ...
+# library("dotwhisker")
+# library("coda")      ## MCMC diagnostics
+# library("aods3")     ## overdispersion diagnostics
+# library("plotMCMC") ## pretty plots from MCMC fits
+# library("bbmle")     ## AICtab
+# library("pbkrtest")  ## parametric bootstrap
+# library("Hmisc")
+# ## for general-purpose reshaping and data manipulation:
+# library("reshape2")
+# library("plyr")
+# ## for illustrating effects of observation-level variance in binary data:
+# library("numDeriv")
+# library("glmmADMB")
+# bb <- glmmADMB:::get_bin_loc()[["bin_loc"]]
+# bpath <- gsub("glmmadmb$","",bb)
+# file.copy(bb,paste0(bpath,"glmmadmb.bak"))
+# bburl <- "http://admb-project.org/buildbot/glmmadmb/"
+# download.file(paste0(bburl,
+#    "glmmadmb-mingw64-r2885-windows8-mingw64.exe"), dest=bb)
+```
+

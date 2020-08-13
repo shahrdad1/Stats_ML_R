@@ -708,7 +708,7 @@ library(tidyverse)
 
 # First remove NA and empty spaces only from character columns
 df %>%
-  filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+  filter_if(is.character, all_vars(!is.na(.) & trimws(.) != ""))
 
 # Next remove leading and trailing spaces from all elements in character columns
 trim.f <- function(col, na.rm = F) { 
@@ -729,7 +729,7 @@ identical(df %>% pull(x), df$x)
 # Finally convert character columns to factor
 
 df %>%
-  filter_if(is.character, any_vars(!is.na(.) & trimws(.) != "")) %>%
+  filter_if(is.character, all_vars(!is.na(.) & trimws(.) != "")) %>%
   mutate_if(is.character, trim.f, na.rm = T) %>%
   mutate_if(is.character, ~ ordered(.x, levels = unlist(.x %>% table %>% dimnames)))
 
@@ -746,7 +746,7 @@ df %>% distinct(x,y)
 
 # msleep %>% 
 #   select(name:order, sleep_total:sleep_rem) %>% 
-#   filter_if(is.character, any_vars(is.na(.)))
+#   filter_if(is.character, all_vars(is.na(.)))
 
 # ------------------------
 ```
@@ -1135,7 +1135,7 @@ wage.df.original = tibble(wage.df)
 remove.empty.characters <- function(df) 
   df %>%
     select_all %>%
-    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+    filter_if(is.character, all_vars(!is.na(.) & trimws(.) != ""))
 
 # Next remove leading and trailing spaces from all elements in character columns
 trim.f <- function(col, na.rm = F) { 
@@ -1793,7 +1793,7 @@ test.df <- auto.df[test.idx, ]
 remove.empty.characters <- function(df) 
   df %>%
     select_all %>%
-    filter_if(is.character, any_vars(!is.na(.) & trimws(.) != ""))
+    filter_if(is.character, all_vars(!is.na(.) & trimws(.) != ""))
 
 # Next remove leading and trailing spaces from all elements in character columns
 trim.f <- function(col, na.rm = F) { 
