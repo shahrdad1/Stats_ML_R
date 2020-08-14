@@ -1608,6 +1608,7 @@ daily %>%
   summarise(flights = n())
 
 ```
+
 ```{r 5.6.7 Exercises}
 library(nycflights13)
 library(tidyverse)
@@ -1892,9 +1893,9 @@ df <- tibble(x = c(rnorm(1000), c(NA, 13.34,2673.1,4674,NA,4585.2,78.678,NA,2754
                    NA, 16.34,2473.1,4854,NA,45.2,7468.8,NA,2534,
                    NA, 156.34,23.188,6744,NA,4576.2,748.478,NA,4724)), 
              y = c(as.character(rnorm(1000)) ,
-                   c("a1df",NA,"t4grf", "sv7",NA, "0wdfwf", "13wdf", "e45rgg", "r546gbn",
-                   "ad2f",NA,"tg5rf", "s8v",NA, "wd11fwf", "wd46f", "er57gg", "rgb67n",
-                   "adf3",NA,"tgrf6", "9sv",NA, "wdfw13f", "wd17f", "ergg68", "rgb85n")))
+                   c("a1df",NA,"t4grf", "sv7",NA, " NA", "13wdf", "e45rgg", "r546gbn",
+                   "ad2f","NA"," NA", "s8v","NA", "wd11fwf", "wd46f", "er57gg", "rgb67n",
+                   "adf3",NA,"tgrf6", "9sv",NA, "wdfw13f", "NA ", "ergg68", "rgb85n")))
 
 
 print(object.size(df), units="KB")
@@ -1902,13 +1903,18 @@ print(object.size(df), units="KB")
 
 # ------------------ select observation with missing values ------------------
 
-na.idx <- which(df %>%
-                  pmap(~c(...) %>% 
-                         reduce(~.x || is.na(.y) , .init = F)) 
-  == T)
+na.idx <- 
+  df %>%
+  pmap(~c(...)) %>%
+  map(~sum(is.na(.) | str_trim(.) == "NA") > 0) %>%
+  unlist %>%
+  which()
 
-# missing values
+rest.idx <- setdiff(seq_len(nrow(df)) , na.idx)
+
 df[na.idx, ]
+df[rest.idx, ]
+
   
 
 # ------------------ ratio of missing values ------------------

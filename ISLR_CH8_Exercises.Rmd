@@ -1159,7 +1159,6 @@ library(tree)
 library(randomForest)
 library(dataPreparation)
 options(warn = 1)
-set.seed(1117)
 oj.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/orange_juice_withmissing.csv", 
                       header=T, stringsAsFactors = F, na.strings = "?")
 
@@ -1481,6 +1480,132 @@ sprintf("pruned tree classifier : specificity 1-FP/N: %s", specificities)
 
 #  pruned tree classifier behaves worse than the full tree:
 
+
+```
+```{r Exercise 10}
+
+library(tidyverse)
+library(tree)
+library(randomForest)
+library(dataPreparation)
+options(warn = 1)
+
+set.seed(1311)
+
+hitters.df = read.csv(
+  "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Hitters.csv", 
+  header=T, stringsAsFactors = F, na.strings = "?")
+
+# -------------------------------
+# a) Cleaning and log transform
+
+# note that Salary is of type string and some of them are NA
+sum(hitters.df$Salary=="NA")
+
+hitters.df <- tibble(hitters.df)
+
+# first devide the data to 70% train and 30% test
+n <- nrow(hitters.df)
+no.of.train <- ceiling(0.7*n)
+no.of.test <- n - no.of.train
+
+train.idx <- sample(seq_len(n), no.of.train)
+test.idx <- setdiff(seq_len(n), train.idx)
+
+train.df <- hitters.df[train.idx, ]
+test.df <- hitters.df[test.idx, ]
+
+#So let's clean train data set
+
+na.train.idx <- 
+  train.df %>%
+  pmap(~c(...)) %>%
+  map(~sum(is.na(.) | str_trim(.) == "NA") > 0) %>%
+  unlist %>%
+  which()
+
+rest.train.idx <- setdiff(seq_len(no.of.train) , na.train.idx)
+
+train.df[na.train.idx, ]
+
+train.df <- train.df[rest.train.idx, ]
+
+# remove constant variables
+constant_cols <- whichAreConstant(train.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(train.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(train.df))
+train.df <- train.df[- bijections_cols]
+
+train.df$Salary <- log(as.numeric(as.character(train.df$Salary)))
+
+# convert all character columns to factor
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+(train.df <- char.to.fctor(train.df))
+str(train.df)
+
+
+# Now clean test data
+
+na.test.idx <- 
+  test.df %>%
+  pmap(~c(...)) %>%
+  map(~sum(is.na(.) | str_trim(.) == "NA") > 0) %>%
+  unlist %>%
+  which()
+
+rest.test.idx <- setdiff(seq_len(no.of.test) , na.test.idx)
+
+test.df[na.test.idx, ]
+
+test.df <- test.df[rest.test.idx, ]
+
+# remove constant variables
+constant_cols <- whichAreConstant(test.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(test.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(test.df))
+test.df <- test.df[- bijections_cols]
+
+test.df$Salary <- log(as.numeric(as.character(test.df$Salary)))
+
+# convert all character columns to factor
+char.to.fctor <- function(df)
+  df %>%
+    mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
+
+(test.df <- char.to.fctor(test.df))
+str(test.df)
+
+
+
+```
+
+
+```{r }
+
+(t <- tibble(x = c("", " NA", "12", "34", " NA", "NA", NA), y = c(NA, "qsfg", "fbf", "12", "NA", "NA ", NA)))
+(na.idx <- 
+  t %>%
+  pmap(~c(...)) %>%
+  map(~sum(is.na(.) | str_trim(.) == "NA") > 0) %>%
+  unlist %>%
+  which()
+)
+
+rest.idx <- setdiff(seq_len(nrow(t)) , na.idx)
+
+t[na.idx, ]
+t[rest.idx, ]
 
 ```
 

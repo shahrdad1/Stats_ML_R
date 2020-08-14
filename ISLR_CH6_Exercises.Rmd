@@ -13,7 +13,7 @@ hitters.df = read.csv(
   "/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Hitters.csv", 
   header=T, stringsAsFactors = F, na.strings = "?")
 
-# note that Salary is od type string and some of them are NA
+# note that Salary is of type string and some of them are NA
 sum(hitters.df$Salary=="NA")
 
 # first remove character NAs
