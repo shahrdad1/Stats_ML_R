@@ -1835,6 +1835,7 @@ encoding <- build_encoding(dataSet = train.df, cols = "auto", verbose = TRUE)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(train.df))
+train.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) train.df[- bijections_cols] else train.df
 
 # discretize year (convert them into intervals)
 bins <- build_bins(dataSet = train.df, cols = "year", n_bins = 10, type = "equal_freq")
@@ -1861,6 +1862,7 @@ test.df <-
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(test.df))
+test.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) test.df[- bijections_cols] else test.df
 
 # discretize year (convert them into intervals)
 bins <- build_bins(dataSet = test.df, cols = "year", n_bins = 10, type = "equal_freq")

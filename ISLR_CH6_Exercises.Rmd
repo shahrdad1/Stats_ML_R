@@ -1289,7 +1289,7 @@ sprintf("Lasso test mse for best lambda: %s", best.lambda)
 (lasso.mse <- mean((pred.lasso - y.test)^2))
 
 print("Coeffs for Lasso: ")
-(coefs.ridge <- predict (cv.out, type = "coefficients", s = best.lambda))
+(coefs.lasso <- predict (cv.out, type = "coefficients", s = best.lambda))
 
 print("e: Fit a PCR model on training set with M chosen by CS and get test.mse")
 

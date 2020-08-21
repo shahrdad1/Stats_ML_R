@@ -970,6 +970,7 @@ auto.df <-
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(auto.df))
+auto.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) auto.df[- bijections_cols] else auto.df
 
 # we fit smoothing spine and step function using GAM'
 # bs="cr" cubic regression spline
@@ -1027,6 +1028,7 @@ plot(auto.df$weight,residuals(model.fit1))
 # vis.gam(model.fit1,plot.type="contour")
 
 ```
+
 ```{r Exercise 9}
 library(boot)
 library(tidyverse)
@@ -1052,6 +1054,8 @@ constant_cols <- whichAreConstant(boston.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(boston.df))
+boston.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) boston.df[- bijections_cols] else boston.df
+
 
 # a) use ploynomial regression to predict nox using dis
 
@@ -1317,6 +1321,7 @@ constant_cols <- whichAreConstant(train.df)
 
 # remove Variables that are in double (for example col1 == col2)
 (double_cols <- whichAreInDouble(train.df))
+train.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) train.df[- bijections_cols] else train.df
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(train.df))
@@ -1345,6 +1350,7 @@ constant_cols <- whichAreConstant(test.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(test.df))
+test.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) test.df[- bijections_cols] else test.df
 
 # It is safe now to convert all character fields into factors
 
@@ -1620,6 +1626,7 @@ plot(best.model.fit, se = T, col = "blue")
 print("Plot shows all covariates except 'private' are non linear")
 
 ```
+
 ```{r Exercise 11}
 library(tidyverse)
 # a) Generate response Y and predictor X1 and X2 using n = 100

@@ -263,7 +263,7 @@ boston.df = read.csv(
 boston.df <- tibble(boston.df)
 
 # see if there is any NA in any records
-nrow(df[which(is.na(boston.df)),])
+na.idx <- which(is.na(boston.df))
 
 # No NA anywhere , let's do usual clean up:
 
@@ -275,6 +275,7 @@ constant_cols <- whichAreConstant(boston.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(boston.df))
+boston.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) boston.df[- bijections_cols] else boston.df
 
 str(boston.df)
 
@@ -403,7 +404,7 @@ boston.df = read.csv(
 boston.df <- tibble(boston.df)
 
 # see if there is any NA in any records
-nrow(df[which(is.na(boston.df)),])
+na.idx <- which(is.na(boston.df))
 
 # No NA anywhere , let's do usual clean up:
 
@@ -415,6 +416,7 @@ constant_cols <- whichAreConstant(boston.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(boston.df))
+boston.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) boston.df[- bijections_cols] else boston.df
 
 set.seed(1113)
 no.of.train <- ceiling(0.7 * nrow(boston.df))
@@ -599,7 +601,7 @@ boston.df = read.csv(
 boston.df <- tibble(boston.df)
 
 # see if there is any NA in any records
-nrow(df[which(is.na(boston.df)),])
+na.idx <- which(is.na(boston.df))
 
 # No NA anywhere , let's do usual clean up:
 
@@ -611,6 +613,7 @@ constant_cols <- whichAreConstant(boston.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(boston.df))
+caravan.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) boston.df[- bijections_cols] else boston.df
 
 set.seed(1113)
 no.of.train <- ceiling(0.7 * nrow(boston.df))
@@ -741,7 +744,7 @@ boston.df = read.csv(
 boston.df <- tibble(boston.df)
 
 # see if there is any NA in any records
-nrow(df[which(is.na(boston.df)),])
+na.idx <- which(is.na(boston.df))
 
 # No NA anywhere , let's do usual clean up:
 
@@ -753,6 +756,7 @@ constant_cols <- whichAreConstant(boston.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(boston.df))
+boston.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) boston.df[- bijections_cols] else boston.df
 
 set.seed(1113)
 no.of.train <- ceiling(0.7 * nrow(boston.df))
@@ -853,6 +857,7 @@ ggplot() +
 library(tidyverse)
 library(tree)
 library(randomForest)
+library(dataPreparation)
 options(warn = 1)
 set.seed(1)
 carseats.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Carseats.csv", 
@@ -881,6 +886,8 @@ constant_cols <- whichAreConstant(carseats.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(carseats.df))
+carseats.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) carseats.df[- bijections_cols] else carseats.df
+
 #----------------------------------------
 # a) split the data into train and test
 set.seed(1113)
@@ -1164,8 +1171,6 @@ oj.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/oran
 
 oj.df <- tibble(oj.df)
 
-str(oj.df)
-
 #----------------------------------------
 # a) split the data into train and test
 # lets first split data to 70% train and the rest test 
@@ -1182,15 +1187,11 @@ remove.NA.chars <- function(df)
   select_all %>%
   filter_if(is.character, all_vars(trimws(.) != "" & trimws(.) != "NA"))
   
-# Finally convert character columns to factor
-
 # Clean up train data set
 train.df <- 
   train.df %>%
   na.omit() %>%
   remove.NA.chars()
-
-str(train.df)
 
 # remove constant variables
 (constant_cols <- whichAreConstant(train.df))
@@ -1200,6 +1201,7 @@ str(train.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(train.df))
+train.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) train.df[- bijections_cols] else train.df
 
 # Convert characters to numeric
 train.df$PriceCH <- as.numeric(as.character(train.df$PriceCH))
@@ -1225,15 +1227,22 @@ constant_cols <- whichAreConstant(train.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(train.df))
-train.df <- train.df[- bijections_cols]
+train.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) train.df[- bijections_cols] else train.df
+
+# It looks Purchase has only two values "CH" and "MM"
+table(train.df$Purchase)
 
 # convert all character columns to factor
 char.to.fctor <- function(df)
   df %>%
     mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
 
+
 train.df <- char.to.fctor(train.df)
-str(train.df)
+# Purchase is encoded by factor as CH -> 1, MM -> 2
+
+head(train.df$Purchase)
+as.integer(head(train.df$Purchase))
 
 # --------- do similar clean up for test data ----------------
 
@@ -1251,9 +1260,7 @@ test.df <-
   na.omit() %>%
   remove.NA.chars()
 
-str(test.df)
 
-  
 # remove constant variables
 (constant_cols <- whichAreConstant(test.df))
 
@@ -1262,6 +1269,7 @@ str(test.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(test.df))
+test.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) test.df[- bijections_cols] else test.df
 
 # Convert characters to numeric
 test.df$PriceCH <- as.numeric(as.character(test.df$PriceCH))
@@ -1287,7 +1295,7 @@ constant_cols <- whichAreConstant(test.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(test.df))
-test.df <- test.df[- bijections_cols]
+test.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) test.df[- bijections_cols] else test.df
 
 # convert all character columns to factor
 char.to.fctor <- function(df)
@@ -1295,16 +1303,15 @@ char.to.fctor <- function(df)
     mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
 
 test.df <- char.to.fctor(test.df)
-str(test.df)
+# Purchase is encoded by factor as CH -> 1, MM -> 2
 
-
-
-
+head(test.df$Purchase)
+as.integer(head(test.df$Purchase))
 
 # --------------------------------------------------------------------------------
 # b) Fit a classification tree , plot the three and interpret the results, testMSE
+# Note since "Purchase" is a factor, tree() API construct a classification tree
 tree.oj <- tree(Purchase ~ ., train.df)
-
 
 # Number of terminal nodes:  7 
 # Residual mean deviance:  0.7995
@@ -1329,56 +1336,66 @@ text(tree.oj, pretty = 0)
 # --------------------------
 # e) predoiction on test data 
 # --------------------------
-threshold = 0.5
+
+
+# pred.probs generates below data:
+#            CH         MM
+# 1   0.5750000 0.42500000
+# 2   0.2388060 0.76119403
+# 3   0.9588015 0.04119850
 
 pred.probs <- predict(tree.oj, newdata = test.df)
-pobs.CH <- pred.probs[,1]
-pobs.MM <- pred.probs[,2]
 
-pred.values <- ifelse(pobs.CH > threshold, "CH", "MM")
+pred.values <- ifelse(pred.probs[, 1] > pred.probs[, 2], "CH", "MM")
 
 obs.values <- test.df$Purchase
 
+(confusion_table <- table(pred.values, obs.values))
+
+# TN: observes as 0 and predicted as 0 
+true.negative <- confusion_table[1,1]
+
+# TP: observes as 1 and predicted as 1 
+true.positive <- confusion_table[2,2]
+
+# FP: observes as 0 and predicted as 1 
+false.positive <- confusion_table[2,1]
+
+# FN: observed as 1 and predicted as 0 
+false.negative <- confusion_table[1,2]
+
+observations.total <- true.negative + false.negative + true.positive + false.positive
+observed.as.0 <- true.negative + false.positive
+observed.as.1 <- false.negative + true.positive
+
+# Random guessing Rate
+(nullClassifier <- max(observed.as.0 / observations.total, observed.as.1 / observations.total))
+
+# classification Rate:
+(classification.rate <- mean(pred.values == obs.values))
+
+# Test error Rate:
+(missclassificationRate <- 1 - classification.rate)
+
+# False Positive Rate (or: Type I error , 1 - specificty):
+(FP_rates <- false.positive / observed.as.0)
+
+# True Positive Rate (or: 1 - Type II error , power , sesetivity , recall):
+(TP_rates <- true.positive / observed.as.1)
+
+# Precision (Accuracy Rate, 1 - false discovery proportion):
+# Model predicted that Two people make a purchase but in reality only one did (50%)
+(precisions <- true.positive / (true.positive + false.positive))
+
+# Specificity
+(specificities <-  1 - false.positive/(false.positive + true.negative))
 
 library(pROC)
-
-confusion_table <- table(pred.values, obs.values)
-  
-nullClassifier <- max(
-    (confusion_table[1,1] + confusion_table[2,1])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ), 
-    (confusion_table[1,2] + confusion_table[2,2])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ))
-
-roc_obj <- roc(obs.values, pobs.CH)
+pred.probs.roc <- ifelse(pred.probs[, 1] > pred.probs[, 2], pred.probs[, 1], pred.probs[, 2])
+roc_obj <- roc(unlist(obs.values), pred.probs.roc)
 
 # Let's draw some AUC plots
 plot(roc_obj, legacy.axes = TRUE)
-
-missclassificationRate <- mean(pred.values != obs.values)
-FP_rates <- confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
-TP_rates <- confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2])
-precisions <- confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1])
-specificities <- 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
-
-# overall fraction of wrong predictions:
-# print(confusion_table)
-
-# average missclassification error rate
-sprintf("tree classifier : Missclassification test error rate : %s", missclassificationRate)
-
-sprintf("tree classifier : Null Classifier: %s", nullClassifier)
-
-sprintf("tree classifier AUC: %s", auc(roc_obj))
-# FP rate:
-sprintf("tree classifier : FP rate (TypeI error, 1 - specificity) : %s", FP_rates)
-
-# TP rate:
-sprintf("tree classifier : TP rate (1-TypeII error, power, sensetivity, recall) : %s", TP_rates)
-
-# precision:
-sprintf("tree classifier : precision: %s", precisions)
-
-# specificity 1-FP/N:
-sprintf("tree classifier : specificity 1-FP/N: %s", specificities)
 
 # ------------------------------------
 # f) apply cv.tree to prune the tree
@@ -1428,64 +1445,80 @@ summary(prune.oj)
 #---------------------------------------------------------------------
 # j) compare test error rates between prune and unpruned tree
 # --------------------------------------------------------------------
-threshold = 0.5
+
+# pred.probs generates below data:
+#            CH         MM
+# 1   0.5750000 0.42500000
+# 2   0.2388060 0.76119403
+# 3   0.9588015 0.04119850
 
 pred.probs <- predict(prune.oj, newdata = test.df)
-pobs.CH <- pred.probs[,1]
-pobs.MM <- pred.probs[,2]
 
-pred.values <- ifelse(pobs.CH > threshold, "CH", "MM")
+pred.values <- ifelse(pred.probs[, 1] > pred.probs[, 2], "CH", "MM")
 
 obs.values <- test.df$Purchase
 
+pred.probs <- predict(tree.oj, newdata = test.df)
+
+(confusion_table <- table(pred.values, obs.values))
+
+# TN: observes as 0 and predicted as 0 
+true.negative <- confusion_table[1,1]
+
+# TP: observes as 1 and predicted as 1 
+true.positive <- confusion_table[2,2]
+
+# FP: observes as 0 and predicted as 1 
+false.positive <- confusion_table[2,1]
+
+# FN: observed as 1 and predicted as 0 
+false.negative <- confusion_table[1,2]
+
+observations.total <- true.negative + false.negative + true.positive + false.positive
+observed.as.0 <- true.negative + false.positive
+observed.as.1 <- false.negative + true.positive
+
+# Random guessing Rate
+(nullClassifier <- max(observed.as.0 / observations.total, observed.as.1 / observations.total))
+
+# classification Rate:
+(classification.rate <- mean(pred.values == obs.values))
+
+# Test error Rate:
+(missclassificationRate <- 1 - classification.rate)
+
+# False Positive Rate (or: Type I error , 1 - specificty):
+(FP_rates <- false.positive / observed.as.0)
+
+# True Positive Rate (or: 1 - Type II error , power , sesetivity , recall):
+(TP_rates <- true.positive / observed.as.1)
+
+# Precision (Accuracy Rate, 1 - false discovery proportion):
+# Model predicted that Two people make a purchase but in reality only one did (50%)
+(precisions <- true.positive / (true.positive + false.positive))
+
+# Specificity
+(specificities <-  1 - false.positive/(false.positive + true.negative))
+
 library(pROC)
+pred.probs.roc <- ifelse(pred.probs[, 1] > pred.probs[, 2], pred.probs[, 1], pred.probs[, 2])
 
-confusion_table <- table(pred.values, obs.values)
-  
-nullClassifier <- max(
-    (confusion_table[1,1] + confusion_table[2,1])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ), 
-    (confusion_table[1,2] + confusion_table[2,2])/(confusion_table[1,1] + confusion_table[2,1]+ confusion_table[1,2] + confusion_table[2,2] ))
-
-roc_obj <- roc(obs.values, pobs.CH)
+roc_obj <- roc(unlist(obs.values), pred.probs.roc)
 
 # Let's draw some AUC plots
 plot(roc_obj, legacy.axes = TRUE)
-
-missclassificationRate <- mean(pred.values != obs.values)
-FP_rates <- confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
-TP_rates <- confusion_table[2,2]/(confusion_table[2,2]+ confusion_table[1,2])
-precisions <- confusion_table[2,2] / (confusion_table[2,2] + confusion_table[2,1])
-specificities <- 1 - confusion_table[2,1]/(confusion_table[2,1]+ confusion_table[1,1])
-
-# overall fraction of wrong predictions:
-# print(confusion_table)
-
-# average missclassification error rate
-sprintf("pruned tree classifier : Missclassification test error rate : %s", missclassificationRate)
-
-sprintf("pruned tree classifier : Null Classifier: %s", nullClassifier)
-
-sprintf("pruned tree classifier AUC: %s", auc(roc_obj))
-# FP rate:
-sprintf("pruned tree classifier : FP rate (TypeI error, 1 - specificity) : %s", FP_rates)
-
-# TP rate:
-sprintf("pruned tree classifier : TP rate (1-TypeII error, power, sensetivity, recall) : %s", TP_rates)
-
-# precision:
-sprintf("pruned tree classifier : precision: %s", precisions)
-
-# specificity 1-FP/N:
-sprintf("pruned tree classifier : specificity 1-FP/N: %s", specificities)
-
 #  pruned tree classifier behaves worse than the full tree:
 
-
 ```
+
+
+
+
 ```{r Exercise 10}
 
 library(tidyverse)
-library(tree)
+library(gbm)
+library(glmnet) # for Lasso
 library(randomForest)
 library(dataPreparation)
 options(warn = 1)
@@ -1497,14 +1530,14 @@ hitters.df = read.csv(
   header=T, stringsAsFactors = F, na.strings = "?")
 
 # -------------------------------
-# a) Cleaning and log transform
+# 
 
 # note that Salary is of type string and some of them are NA
 sum(hitters.df$Salary=="NA")
 
 hitters.df <- tibble(hitters.df)
 
-# first devide the data to 70% train and 30% test
+# b) first devide the data to 70% train and 30% test
 n <- nrow(hitters.df)
 no.of.train <- ceiling(0.7*n)
 no.of.test <- n - no.of.train
@@ -1514,6 +1547,8 @@ test.idx <- setdiff(seq_len(n), train.idx)
 
 train.df <- hitters.df[train.idx, ]
 test.df <- hitters.df[test.idx, ]
+
+# a) Cleaning and log transform
 
 #So let's clean train data set
 
@@ -1526,8 +1561,6 @@ na.train.idx <-
 
 rest.train.idx <- setdiff(seq_len(no.of.train) , na.train.idx)
 
-train.df[na.train.idx, ]
-
 train.df <- train.df[rest.train.idx, ]
 
 # remove constant variables
@@ -1538,7 +1571,7 @@ constant_cols <- whichAreConstant(train.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(train.df))
-train.df <- train.df[- bijections_cols]
+train.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) train.df[- bijections_cols] else train.df
 
 train.df$Salary <- log(as.numeric(as.character(train.df$Salary)))
 
@@ -1547,9 +1580,7 @@ char.to.fctor <- function(df)
   df %>%
     mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
 
-(train.df <- char.to.fctor(train.df))
-str(train.df)
-
+train.df <- char.to.fctor(train.df)
 
 # Now clean test data
 
@@ -1562,8 +1593,6 @@ na.test.idx <-
 
 rest.test.idx <- setdiff(seq_len(no.of.test) , na.test.idx)
 
-test.df[na.test.idx, ]
-
 test.df <- test.df[rest.test.idx, ]
 
 # remove constant variables
@@ -1574,7 +1603,8 @@ constant_cols <- whichAreConstant(test.df)
 
 # remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
 (bijections_cols <- whichAreBijection(test.df))
-test.df <- test.df[- bijections_cols]
+test.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) test.df[- bijections_cols] else test.df
+
 
 test.df$Salary <- log(as.numeric(as.character(test.df$Salary)))
 
@@ -1583,16 +1613,1197 @@ char.to.fctor <- function(df)
   df %>%
     mutate_if(is.character, ~ factor(.x, levels = (.x %>% table() %>% names())))
 
-(test.df <- char.to.fctor(test.df))
-str(test.df)
+test.df <- char.to.fctor(test.df)
 
+
+# c) perform Regression boosting on training sets with 1000 trees for range of shrinkage parameters
+
+shrinkage.MSE.train.plot <- tibble(lambdas = NULL, train.MSEs = NULL, DataSet=NULL)
+shrinkage.MSE.test.plot <- tibble(lambdas = NULL, test.MSEs = NULL, r.squared = NULL, DataSet=NULL)
+
+for (lambda in seq(0.1, 1, len = 100)){
+  hitters.boost <- gbm(Salary ~ ., data = train.df, distribution="gaussian", 
+                     n.trees = 1000, shrinkage=lambda, verbose=F)
+ 
+  # claculate training MSE
+  yhat.boost.train <- predict(hitters.boost, newdata = train.df, n.trees = 1000)
+  stopifnot(identical (length(yhat.boost.train) , length(train.df$Salary)) )
+
+  
+  shrinkage.MSE.train.plot <- rbind(shrinkage.MSE.train.plot , 
+                   tibble(lambdas = lambda,
+                          train.MSEs = mean((yhat.boost.train - train.df$Salary)^2),
+                          DataSet = "train"))
+  
+  
+  
+  # claculate test MSE
+  yhat.boost.test <- predict(hitters.boost, newdata = test.df, n.trees = 1000)
+  stopifnot(identical (length(yhat.boost.test) , length(test.df$Salary)) )
+
+
+  shrinkage.MSE.test.plot <- rbind(shrinkage.MSE.test.plot , 
+                   tibble(lambdas = lambda,
+                          test.MSEs = mean((yhat.boost.test - test.df$Salary)^2),
+                          r.squared = round((cor(yhat.boost.test, test.df$Salary) ^ 2), 3),
+                          DataSet = "test"))
+  
+
+}
+
+
+ggplot() + 
+        # plot test samples
+        geom_line(data = shrinkage.MSE.train.plot,
+            aes(x = lambdas, y = train.MSEs, color = DataSet)) +
+  labs(title="Shinkage factor vs. train MSE")
+
+ggplot() + 
+        # plot test samples
+        geom_line(data = shrinkage.MSE.test.plot,
+            aes(x = lambdas, y = test.MSEs, color = DataSet)) +
+  labs(title="Shinkage factor vs. test MSE")
+
+
+
+# e) Compare test.mse of boosing with test.mse of linear model and lasso 
+
+# find which lambda value causes minimum test.mse
+shrinkage.MSE.test.plot %>% slice(which.min(test.MSEs))
+
+# build a linear model on training data and find the test mse
+hitters.lm = lm(Salary ~ ., data = train.df)
+preds <- predict(hitters.lm,  test.df, interval = "prediction")
+yhat.lm.test <- preds[,"fit"]
+stopifnot(identical (length(yhat.lm.test), length(test.df$Salary)) )
+
+print ("Apply Linear regression:")
+
+# LM test MSE
+(test.MSE = mean((yhat.lm.test - test.df$Salary)^2))
+
+# LM R squared
+(r.squared = round((cor(yhat.lm.test, test.df$Salary) ^ 2), 3))
+
+# Clearly performance of linear model cannot beat boosing model
+
+
+print ("Apply Lasso  cross validation to find the best lambda and corresponding coeffs")
+
+# First construct matrix from dataframe (and drop intercept column)
+
+x.train <- model.matrix(Salary~., train.df)[, -1] # drop the intercept
+x.test <- model.matrix(Salary~., test.df)[, -1] # drop the intercept
+y.train <- train.df$Salary
+y.test <- test.df$Salary
+
+cv.out <- cv.glmnet(x.train, y.train, alpha=1) # Lasso
+plot(cv.out)
+best.lambda <- cv.out$lambda.min
+
+# predict the model on test
+pred.lasso <- predict(cv.out, s=best.lambda, newx=x.test)
+
+# Lasso test mse for the best lambda we chose:
+(lasso.mse <- mean((pred.lasso - y.test)^2))
+
+# R squared for the best lambda we chose:
+(lasso.R.squared <- round((cor(pred.lasso, y.test) ^ 2), 3))
+
+# f) Most important predictors in boostnig model:
+
+summary (hitters.boost)
+
+# it to what predictors lasso chose:
+# Coeffs for Lasso:
+(coefs.lasso <- predict (cv.out, type = "coefficients", s = best.lambda))
+
+# It is noticable that "CHits" predictor which is the most important 
+# predictor in boosting model is dropped by Lasso
+
+# g) apply bagging to training set and calculate testMSE and R squared
+hitters.bag = randomForest(Salary ~ ., data = train.df, mtry=ncol(train.df) - 1, importance=T)
+hitters.bag
+
+yhat.bag <- predict(hitters.bag, newdata = test.df)
+
+# bagging test mse:
+(bag.mse <- mean((yhat.bag - test.df$Salary)^2))
+
+# R squared for testMSE:
+(bag.R.squared <- round((cor(yhat.bag, test.df$Salary) ^ 2), 3))
+
+# surprisingly bagging produced better result than gradiant boosting
+
+```
+```{r Exercise 11}
+library(tidyverse)
+library(gbm)
+library(glmnet) # for Lasso
+library(randomForest)
+library(dataPreparation)
+library(class)
+options(warn = 1)
+set.seed(1113)
+caravan.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Caravan.csv", header=T, 
+                      stringsAsFactors = F, na.strings = "?")
+
+caravan.df = as_tibble(caravan.df)
+
+
+# remove constant variables
+constant_cols <- whichAreConstant(caravan.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(caravan.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(caravan.df))
+
+caravan.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) caravan.df[- bijections_cols] else caravan.df
+
+nrow(caravan.df)
+caravan.df %>% 
+   filter_all(all_vars(is.na(.))) 
+
+# No NA is in data set 
+
+# Since boosting API with 'benoulli' distribution needs 0 and 1 values
+# we cannot use facotr, instead we should manually encode them
+caravan.df$Purchase <- ifelse(caravan.df$Purchase == "Yes", 1, 0)
+str(caravan.df)
+# a) let's creata 1000 observations in training set and the rest in test set:
+
+(n <- nrow(caravan.df))
+train.idx <- sample(seq_len(n), 1000)
+test.idx <- setdiff(seq_len(n), train.idx)
+
+stopifnot(identical(length(train.idx) + length(test.idx), n))
+
+train.df <- caravan.df[train.idx, ]
+test.df <- caravan.df[test.idx, ]
+
+
+
+# b) Fit a boosting model and find the most important variable
+caravan.boost <- gbm(Purchase ~ . , data = train.df, distribution="bernoulli", 
+                   n.trees = 1000, shrinkage=0.01, verbose=F)
+
+# MSKC is the most important predictor
+summary(caravan.boost)
+
+# c) predict that a person will make a purchase if estimated probability of purchase > 0.2
+prob.boost.test <- predict(caravan.boost, newdata = test.df, n.trees = 1000)
+
+# Since we encoded Yes as 1 and No as 0 we have
+yhat.boost.test <- ifelse(prob.boost.test > 0.2, 1, 0)
+
+stopifnot(identical(length(prob.boost.test),length(test.df$Purchase)))
+
+#Confusion Matrix:
+(confusion_table <- table(yhat.boost.test, test.df$Purchase))
+
+# TN: observes as 0 and predicted as 0 (No of people that predicted Not to make any purchase and they really did not)
+true.negative <- confusion_table[1,1]
+
+# TP: observes as 1 and predicted as 1 (No of people that predicted to make a purchase and in reality they did)
+true.positive <- confusion_table[2,2]
+
+# FP: observes as 0 and predicted as 1 (No of people that predicted to make a purchase but they did not)
+false.positive <- confusion_table[2,1]
+
+# FN: observed as 1 and predicted as 0 (No of people that predicted they did not make a purchase but they in realty did)
+false.negative <- confusion_table[1,2]
+
+observations.total <- true.negative + false.negative + true.positive + false.positive
+observed.as.0 <- true.negative + false.positive
+observed.as.1 <- false.negative + true.positive
+
+# Random guessing Rate
+(nullClassifier <- max(observed.as.0 / observations.total, observed.as.1 / observations.total))
+
+# classification Rate:
+(classification.rate <- mean(yhat.boost.test == test.df$Purchase))
+
+# Test error Rate:
+(missclassificationRate <- 1 - classification.rate)
+
+# False Positive Rate (or: Type I error , 1 - specificty):
+(FP_rates <- false.positive / observed.as.0)
+
+# True Positive Rate (or: 1 - Type II error , power , sesetivity , recall):
+(TP_rates <- true.positive / observed.as.1)
+
+# Precision (Accuracy Rate, 1 - false discovery proportion):
+# Model predicted that Two people make a purchase but in reality only one did (50%)
+(precisions <- true.positive / (true.positive + false.positive))
+
+# Specificity
+(specificities <-  1 - false.positive/(false.positive + true.negative))
+
+library(pROC)
+roc_obj <- roc(unlist(test.df$Purchase), prob.boost.test)
+
+# Let's draw some AUC plots
+plot(roc_obj, legacy.axes = TRUE)
+
+# -------------------------------------------------------------
+# Let's use logiostic regression to estimate what percentage of 
+# people who predicted to make a purchase and they really did
+glm.model <- glm(Purchase ~ . , data = train.df, family = binomial)
+
+summary(glm.model)
+# do the prediction using the model
+preds <- predict(glm.model, newdata=test.df, se = T)
+
+# Note that predict function for glm model gets the prediction for logit i.e: 
+# log(Pr(Y=1 | X) / (1 - Pr(Y=1 | X))) = X*beta and also the standard error is 
+# of the same form, clealry to get prediction for Pr(Y=1|X) we need 
+# to calculate exp(X*beta)/(1+exp(X*beta))
+
+prob.predict <- exp(preds$fit)/(1+exp(preds$fit))
+se.bound.logit <- cbind(preds$fit + 2*preds$se, preds$fit - 2*preds$se)
+se.bound <- apply(se.bound.logit, 2, function(x) exp(x)/(1+exp(x)))
+
+yhat.logReg.test <- ifelse(prob.predict > 0.2, 1, 0)
+
+stopifnot(identical(length(prob.predict),length(test.df$Purchase)))
+
+#Confusion Matrix:
+(confusion_table <- table(yhat.logReg.test, test.df$Purchase))
+
+# TN: observes as 0 and predicted as 0 (No of people that predicted Not to make any purchase and they really did not)
+true.negative <- confusion_table[1,1]
+
+# TP: observes as 1 and predicted as 1 (No of people that predicted to make a purchase and in reality they did)
+true.positive <- confusion_table[2,2]
+
+# FP: observes as 0 and predicted as 1 (No of people that predicted to make a purchase but they did not)
+false.positive <- confusion_table[2,1]
+
+# FN: observed as 1 and predicted as 0 (No of people that predicted they did not make a purchase but they in realty did)
+false.negative <- confusion_table[1,2]
+
+observations.total <- true.negative + false.negative + true.positive + false.positive
+observed.as.0 <- true.negative + false.positive
+observed.as.1 <- false.negative + true.positive
+
+# Random guessing Rate
+(nullClassifier <- max(observed.as.0 / observations.total, observed.as.1 / observations.total))
+
+# classification Rate:
+(classification.rate <- mean(yhat.logReg.test == test.df$Purchase))
+
+# Test error Rate:
+(missclassificationRate <- 1 - classification.rate)
+
+# False Positive Rate (or: Type I error , 1 - specificty):
+(FP_rates <- false.positive / observed.as.0)
+
+# True Positive Rate (or: 1 - Type II error , power , sesetivity , recall):
+(TP_rates <- true.positive / observed.as.1)
+
+# Precision (Accuracy Rate, 1 - false discovery proportion):
+# Model predicted that 311+57 people make a purchase but in reality only 57 people did (15%)
+(precisions <- true.positive / (true.positive + false.positive))
+
+# Specificity
+(specificities <-  1 - false.positive/(false.positive + true.negative))
+
+library(pROC)
+roc_obj <- roc(unlist(test.df$Purchase), yhat.logReg.test)
+
+# Let's draw some AUC plots
+plot(roc_obj, legacy.axes = TRUE)
+
+# Precision drop down from 50% in gradiant boosting to 15% in logistic regression 
+
+
+
+
+
+```
+```{r Exercise 12 part 1 Stochastic GBM}
+library(tidyverse)
+library(gbm)      # for original implementation of regular and stochastic GBMs
+library(h2o)      # for a java-based implementation of GBM variants
+library(xgboost)  # for fitting extreme gradient boosting
+library(glmnet) # for Lasso
+library(randomForest)
+library(dataPreparation)
+library(class)
+library(doParallel)  # for parallel backend to foreach
+library(foreach)     # for parallel processing with for loops
+
+# Modeling packages
+library(caret)       # for general model fitting
+library(rpart)       # for fitting decision trees
+library(ipred)   
+
+
+options(warn = 1)
+set.seed(1113)
+
+
+smarket.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Smarket.csv", 
+           header=T, stringsAsFactors = F, na.strings = "?")
+
+str(smarket.df)
+# remove constant variables
+constant_cols <- whichAreConstant(smarket.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(smarket.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(smarket.df))
+
+smarket.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) 
+  smarket.df[- bijections_cols] else smarket.df
+
+smarket.df %>% 
+   filter_all(all_vars(is.na(.))) 
+
+# make sure no "NA is in the charachter column Direction"
+(na.count <- smarket.df %>%
+  filter(Direction == "NA") %>%
+  nrow)
+
+stopifnot(na.count != numeric(0))
+
+# make sure all are Either "Up" of #Down"
+
+ups <- smarket.df %>%
+  filter(Direction == "Up") %>%
+  nrow
+
+downs <- smarket.df %>%
+  filter(Direction == "Down") %>%
+  nrow
+
+stopifnot(identical(ups+downs, nrow(smarket.df)))
+
+# Since boosting API with 'benoulli' distribution needs 0 and 1 values
+# we cannot use facotr, instead we should manually encode them
+smarket.df$Direction.01 <- ifelse(smarket.df$Direction == "Up", 1, 0)
+
+smarket.df$Direction <- as.factor(smarket.df$Direction)
+
+str(smarket.df$Direction)
+
+# seems like "Up" -> 1 and "Down" -> 2
+head(smarket.df$Direction)
+head(as.integer(smarket.df$Direction))
+
+# split to train and test
+(n <- nrow(smarket.df))
+(no.of.train <- round(0.7*n, 3))
+train.idx <- sample(seq_len(n), no.of.train) 
+test.idx <- setdiff(seq_len(n), train.idx)
+
+stopifnot(identical(length(train.idx) + length(test.idx), n))
+
+train.df <- smarket.df[train.idx, ]
+test.df <- smarket.df[test.idx, ]
+
+
+# ----------------------Gradiant boosting -----------------------
+# Boosting hyperparameters: 
+# -------------------------
+#   
+# Number of trees: The total number of trees in the sequence or ensemble.
+# Learning rate (shrinkage): the smaller this value, the more accurate the model can 
+# be but also will require more trees in the sequence.
+# 
+#
+# Tree hyperparameters:
+# ----------------------  
+# 
+# Tree depth: Controls the depth of the individual trees. Typical values range from a 
+# depth of 3–8 but it is not uncommon to see a tree depth of 1  Note that larger n or p
+# training data sets are more tolerable to deeper trees.
+# 
+# Minimum number of observations in terminal nodes: Controls the complexity of each tree. 
+# Typical values range from 5–15 where higher values help prevent a model from learning 
+# relationships which might be highly specific to the particular sample selected 
+# for a tree (overfitting) but smaller values can help with imbalanced target classes in classification problems.
+
+
+# "expand.grid" create a Data Frame from All Combinations of Factor Variables
+hyper_grid <- expand.grid(
+  learning_rate = c(0.3, 0.1, 0.05, 0.01, 0.005), # values between 0.05–0.2 should work across a wide range of problems
+  RMSE = NA,
+  trees = NA,
+  time = NA
+)
+
+for(i in seq_len(nrow(hyper_grid))){
+  set.seed(123)  
+  train_time <- system.time({
+    m <- gbm(
+      formula = Direction.01 ~ . -Direction ,
+      data = train.df,
+      distribution = "bernoulli",
+      n.trees = 5000, 
+      shrinkage = hyper_grid$learning_rate[i], 
+      interaction.depth = 3, 
+      n.minobsinnode = 10,
+      cv.folds = 10 
+   )
+  })
+  
+  # add SSE, trees, and training time to results
+  hyper_grid$RMSE[i]  <- sqrt(min(m$cv.error))
+  hyper_grid$trees[i] <- which.min(m$cv.error)
+  hyper_grid$Time[i]  <- train_time[["elapsed"]]
+
+}
+
+# The optimal value for learning rate (i.e shrinkage parameter) 0.3
+arrange(hyper_grid, RMSE)
+
+# Next, we’ll set our learning rate at the optimal level (0.3) and tune 
+# the tree specific hyperparameters (interaction.depth and n.minobsinnode). 
+# Adjusting the tree-specific parameters provides us with an additional 600 reduction in RMSE.
+
+# search grid
+hyper_grid <- expand.grid(
+  n.trees = 6000,
+  shrinkage = 0.3,
+  interaction.depth = c(3, 5, 7),
+  n.minobsinnode = c(5, 10, 15)
+)
+
+model_fit <- function(n.trees, shrinkage, interaction.depth, n.minobsinnode) {
+  set.seed(123)
+  m <- gbm(
+    formula = Direction.01 ~ . -Direction,
+    data = train.df,
+    distribution = "bernoulli",
+    n.trees = n.trees,
+    shrinkage = shrinkage,
+    interaction.depth = interaction.depth,
+    n.minobsinnode = n.minobsinnode,
+    cv.folds = 10
+  )
+  # compute RMSE
+  sqrt(min(m$cv.error))
+}
+
+# perform search grid with functional programming
+hyper_grid$rmse <- purrr::pmap_dbl(
+  hyper_grid,
+  ~ model_fit(
+    n.trees = ..1,
+    shrinkage = ..2,
+    interaction.depth = ..3,
+    n.minobsinnode = ..4
+    )
+)
+
+# Top row RMSE shows it is reduced to 7.332922e-07 
+arrange(hyper_grid, rmse)
+
+# thus we choose values of n.trees -> 6000, interaction.depth -> 3, 
+# and n.minobsinnode -> 5 from the top row as the parameters of 
+# top model so far.
+# Now to improve the model we took our top model’s hyperparameter settings, 
+
+m <- gbm(
+  formula = Direction.01 ~ . -Direction,
+  data = train.df,
+  distribution = "bernoulli",
+  n.trees = 10000,
+  shrinkage = 0.06,
+  interaction.depth = 3,
+  n.minobsinnode = 5,
+  cv.folds = 10
+)
+# compute RMSE
+sqrt(min(m$cv.error))
+
+# Seems like no more improvenebt is possible thus the following are best set of 
+# hyperparameters :
+
+  # n.trees = 6000,
+  # shrinkage = 0.3,
+  # interaction.depth = 3,
+  # n.minobsinnode = 5,
+
+
+# Stochastic hyperparameters:
+# ---------------------------
+# _Subsample rows before creating each tree (available in gbm, h2o, & xgboost)
+# _Subsample columns before creating each tree (h2o & xgboost)
+# _Subsample columns before considering each split in each tree (h2o & xgboost)
+# 
+# Generally, aggressive subsampling of rows, such as selecting only 50% or less of 
+# the training data, has shown to be beneficial and typical values range between 0.5–0.8.
+
+# Now let's use h2o for grid search to implement a stochastic GBM 
+# We use the optimal hyperparameters above and build onto this by assessing a 
+# range of values for subsampling rows and columns before each tree is built, 
+# and subsampling columns before each split.
+# To speed up training we use early stopping for the individual GBM modeling 
+# process and also add a stochastic search criteria.
+
+# initial h2o setup
+h2o.no_progress()
+h2o.init(ip = "localhost", port = 54321, nthreads= -1, max_mem_size = "10g")
+# prostate_path <- system.file("extdata", "prostate.csv", package = "h2o")
+# prostate <- h2o.uploadFile(path = prostate_path)
+h2o.removeAll()
+
+
+
+
+train_h2o <- as.h2o(train.df)
+test_h2o <- as.h2o(test.df)
+
+# note that for classification gbm in h2o we have to use factor response
+# quite oposite to R's gbm package that we must use numeric 0 , 1 as response variable
+response <- "Direction"
+predictors <- setdiff(colnames(train.df), c(response, "Direction.01"))
+
+
+# refined hyperparameter grid (you must use list)
+hyper_grid <- list(
+  sample_rate = c(0.5, 0.75, 1),              # row subsampling
+  col_sample_rate = c(0.5, 0.75, 1),          # col subsampling for each split
+  col_sample_rate_per_tree = c(0.5, 0.75, 1)  # col subsampling for each tree
+)
+
+# random grid search strategy (you must use list)
+search_criteria <- list(
+  strategy = "RandomDiscrete",
+  stopping_metric = "mse",
+  stopping_tolerance = 0.001,  # stop if improvement is less than 0.05% in over all OOB error
+  stopping_rounds = 10,       # over last 10 trees  
+  max_runtime_secs = 60*5    # or stop search after 5 minutes  
+)
+
+
+# perform grid search 
+grid <- h2o.grid(
+  algorithm = "gbm",
+  grid_id = "gbm_grid",
+  x = predictors, 
+  y = response,
+  training_frame = train_h2o,
+  hyper_params = hyper_grid,
+  ntrees = 6000,
+  learn_rate = 0.3,
+  max_depth = 3,
+  min_rows = 5,
+  nfolds = 10,
+  stopping_rounds = 10,
+  stopping_tolerance = 0,
+  search_criteria = search_criteria,
+  seed = 123
+)
+
+# collect the results and sort by our model performance metric of choice
+grid_perf <- h2o.getGrid(
+  grid_id = "gbm_grid", 
+  sort_by = "mse", 
+  decreasing = FALSE
+)
+
+grid_perf
+
+# Grab the model_id for the top model, chosen by cross validation error
+best_model_id <- grid_perf@model_ids[[1]]
+best_model <- h2o.getModel(best_model_id)
+
+
+# variable importance plot
+vip::vip(best_model) 
+
+
+# Now let’s get performance metrics on the best model
+h2o.giniCoef(best_model)
+h2o.performance(model = best_model, xval = TRUE)
+
+summary(best_model)
+
+
+# pred <- h2o.predict(object=best_model, newdata=test_h2o)
+
+# predict that a person will make a purchase if estimated probability of purchase > 0.5
+pred.boost.test <- predict(best_model, newdata = test_h2o, n.trees = 6000)
+pred.boost.test <- as_tibble(pred.boost.test)
+# Since we encoded Yes as 1 and No as 0 we have
+
+stopifnot(identical(length(pred.boost.test$predict),length(test.df$Direction)))
+
+#Confusion Matrix:
+(confusion_table <- table(pred.boost.test$predict, test.df$Direction))
+
+# TN: observes as 0 and predicted as 0 (No of people that predicted Not to make any purchase and they really did not)
+true.negative <- confusion_table[1,1]
+
+# TP: observes as 1 and predicted as 1 (No of people that predicted to make a purchase and in reality they did)
+true.positive <- confusion_table[2,2]
+
+# FP: observes as 0 and predicted as 1 (No of people that predicted to make a purchase but they did not)
+false.positive <- confusion_table[2,1]
+
+# FN: observed as 1 and predicted as 0 (No of people that predicted they did not make a purchase but they in realty did)
+false.negative <- confusion_table[1,2]
+
+observations.total <- true.negative + false.negative + true.positive + false.positive
+observed.as.0 <- true.negative + false.positive
+observed.as.1 <- false.negative + true.positive
+
+# Random guessing Rate
+(nullClassifier <- max(observed.as.0 / observations.total, observed.as.1 / observations.total))
+
+# classification Rate:
+(classification.rate <- mean(pred.boost.test$predict == test.df$Direction))
+
+# Test error Rate:
+(missclassificationRate <- 1 - classification.rate)
+
+# False Positive Rate (or: Type I error , 1 - specificty):
+(FP_rates <- false.positive / observed.as.0)
+
+# True Positive Rate (or: 1 - Type II error , power , sesetivity , recall):
+(TP_rates <- true.positive / observed.as.1)
+
+# Precision (Accuracy Rate, 1 - false discovery proportion):
+# Model predicted that Two people make a purchase but in reality only one did (50%)
+(precisions <- true.positive / (true.positive + false.positive))
+
+# Specificity
+(specificities <-  1 - false.positive/(false.positive + true.negative))
+
+library(pROC)
+roc_obj <- roc(unlist(test.df$Direction), pred.boost.test$Up)
+
+# Let's draw some AUC plots
+plot(roc_obj, legacy.axes = TRUE)
 
 
 ```
 
 
-```{r }
+```{r Exercise 12 part 2 Bagging}
+library(tidyverse)       # for data wrangling
+library(doParallel)  # for parallel backend to foreach
+library(foreach)     # for parallel processing with for loops
+library(dataPreparation)
+# Modeling packages
+library(caret)       # for general model fitting
+library(rpart)       # for fitting decision trees
+library(ipred)       # for fitting bagged decision trees
 
+
+options(warn = 1)
+set.seed(1113)
+
+
+smarket.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Smarket.csv", 
+           header=T, stringsAsFactors = F, na.strings = "?")
+
+str(smarket.df)
+# remove constant variables
+constant_cols <- whichAreConstant(smarket.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(smarket.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(smarket.df))
+
+smarket.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) 
+  smarket.df[- bijections_cols] else smarket.df
+
+smarket.df %>% 
+   filter_all(all_vars(is.na(.))) 
+
+# make sure no "NA is in the charachter column Direction"
+(na.count <- smarket.df %>%
+  filter(Direction == "NA") %>%
+  nrow)
+
+stopifnot(na.count != numeric(0))
+
+# make sure all are Either "Up" of #Down"
+
+ups <- smarket.df %>%
+  filter(Direction == "Up") %>%
+  nrow
+
+downs <- smarket.df %>%
+  filter(Direction == "Down") %>%
+  nrow
+
+stopifnot(identical(ups+downs, nrow(smarket.df)))
+
+smarket.df$Direction <- as.factor(smarket.df$Direction)
+
+str(smarket.df$Direction)
+
+# seems like "Up" -> 1 and "Down" -> 2
+head(smarket.df$Direction)
+head(as.integer(smarket.df$Direction))
+
+# split to train and test
+(n <- nrow(smarket.df))
+(no.of.train <- round(0.7*n, 3))
+train.idx <- sample(seq_len(n), no.of.train) 
+test.idx <- setdiff(seq_len(n), train.idx)
+
+stopifnot(identical(length(train.idx) + length(test.idx), n))
+
+train.df <- smarket.df[train.idx, ]
+test.df <- smarket.df[test.idx, ]
+
+# ------------------------------------
+# apply bagging 
+# we can use OOB error rate (similar to CV) to find the best number of trees asn you see below
+bagging.plot.data.OOB <- tibble(OOB.err = NULL, no.of.trees = NULL, train.time = NULL)
+for (no.tree in 50:100){
+
+  train_time <- system.time({
+    smarket.model <- bagging(
+      formula = Direction ~ .,
+      data = train.df,
+      nbagg = no.tree,  # number of iterations to include in the bagged model (100 bootstrap replications)
+      coob = TRUE, # use the OOB error rate
+      #  uses rpart::rpart() build deep trees (no pruning) 
+      # that require just two observations in a node to split
+      control = rpart.control(minsplit = 2, no.of.trees = no.tree, train_time) 
+                                                    
+    )
+  })
+  
+  bagging.plot.data.OOB <- rbind(bagging.plot.data.OOB , 
+                             tibble(OOB.err = smarket.model$err, 
+                                    no.of.trees = no.tree, 
+                                    train.time = train_time))
+}
+bagging.plot.data.OOB
+# For al the trees Out-of-bag estimate of misclassification error is zero!!
+# Let's apply bagging with 10-fold CV to see how well our ensemble will generalize
+
+smarket.model.cv <- train(
+  Direction ~ .,
+  data = train.df,
+  method = "treebag",
+  trControl = trainControl(method = "cv", number = 10),
+  nbagg = 200,  
+  control = rpart.control(minsplit = 2, cp = 0)
+)
+
+#----------------- Interpretation of Bagging Model -----------------------
+# Bagging improves the prediction accuracy for high variance (and low bias) 
+# models at the expense of interpretability and computational speed. However, 
+# using various interpretability algorithms such as VIPs and PDPs, 
+# we can still make inferences about how our bagged model leverages feature information
+
+# with bagging, since we use many trees built on bootstrapped samples, we are likely 
+# to see many more features used for splits. Consequently, we tend to have many 
+# more features involved but with lower levels of importance.
+vip::vip(smarket.model.cv, num_features = 5)
+
+
+# Although the averaging effect of bagging diminishes the ability to interpret the 
+# final ensemble, PDPs and other interpretability methods help us to 
+# interpret any “black box” model. plot below highlights the unique, and sometimes 
+# non-linear, non-monotonic relationships that may exist between a feature and response.
+
+# Construct partial dependence plots
+p1 <- pdp::partial(
+  smarket.model.cv, 
+  pred.var = "Today",
+  grid.resolution = 20
+  ) %>% 
+  autoplot()
+
+p2 <- pdp::partial(
+  smarket.model.cv, 
+  pred.var = "Lag1",
+  grid.resolution = 20
+  ) %>% 
+  autoplot()
+
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+
+
+# get the final plot and do the prediction
+smarket.model <- smarket.model.cv$finalModel
+
+
+# do the prediction 
+
+pred.bag.test <- predict(smarket.model, newdata = test.df)
+
+stopifnot(identical(length(pred.bag.test),length(test.df$Direction)))
+
+#Confusion Matrix:
+(confusion_table <- table(pred.bag.test, test.df$Direction))
+
+# TN: observes as 0 and predicted as 0 (No of people that predicted Not to make any purchase and they really did not)
+true.negative <- confusion_table[1,1]
+
+# TP: observes as 1 and predicted as 1 (No of people that predicted to make a purchase and in reality they did)
+true.positive <- confusion_table[2,2]
+
+# FP: observes as 0 and predicted as 1 (No of people that predicted to make a purchase but they did not)
+false.positive <- confusion_table[2,1]
+
+# FN: observed as 1 and predicted as 0 (No of people that predicted they did not make a purchase but they in realty did)
+false.negative <- confusion_table[1,2]
+
+observations.total <- true.negative + false.negative + true.positive + false.positive
+observed.as.0 <- true.negative + false.positive
+observed.as.1 <- false.negative + true.positive
+
+# Random guessing Rate
+(nullClassifier <- max(observed.as.0 / observations.total, observed.as.1 / observations.total))
+
+# classification Rate:
+(classification.rate <- mean(pred.bag.test == test.df$Direction))
+
+# Test error Rate:
+(missclassificationRate <- 1 - classification.rate)
+
+# False Positive Rate (or: Type I error , 1 - specificty):
+(FP_rates <- false.positive / observed.as.0)
+
+# True Positive Rate (or: 1 - Type II error , power , sesetivity , recall):
+(TP_rates <- true.positive / observed.as.1)
+
+# Precision (Accuracy Rate, 1 - false discovery proportion):
+# Model predicted that Two people make a purchase but in reality only one did (50%)
+(precisions <- true.positive / (true.positive + false.positive))
+
+# Specificity
+(specificities <-  1 - false.positive/(false.positive + true.negative))
+
+# -------------------- Parallelizing Bagging -----------------------------
+# Since bagging is essentially paralle algorithm we can use some parallelism here
+
+# Create a parallel socket cluster
+# cl <- makeCluster(8) # use 8 workers
+# registerDoParallel(cl) # register the parallel backend
+# 
+# # Fit trees in parallel and compute predictions on the test set
+# predictions <- foreach(
+#   icount(160), 
+#   .packages = "rpart", 
+#   .combine = cbind
+#   ) %dopar% {
+#     # bootstrap copy of training data
+#     index <- sample(nrow(train.df), replace = TRUE)
+#     train_boot <- train.df[index, ]  
+#   
+#     # fit tree to bootstrap copy
+#     bagged_tree <- rpart(
+#       Direction ~ ., 
+#       control = rpart.control(minsplit = 2, cp = 0),
+#       data = train_boot
+#       ) 
+#     
+#     predict(bagged_tree, newdata = test.df)
+# }
+# 
+# # The result is 375 predictions (each for one row in test.df) 
+# # performed by 160 trees (2*160columns , one for "Up" and one for "Down")
+# predictions %>%
+#   as.data.frame()
+# 
+# # We need to calculate RMSE
+# predictions %>%
+#   as.data.frame %>%
+#   pmap(~sum(c(...))) %>%
+#   unlist() %>%
+#   tibble(Ups = . , Downs = ncol(predictions) - .) %>%
+#   mutate(
+#     observation = 1:n(),
+#     actual = test.df$Direction)
+#   
+# stopCluster(cl)
+```
+
+```{r Exercise 12 part 3 RandomForest}
+library(tidyverse)       # for data wrangling
+library(doParallel)  # for parallel backend to foreach
+library(dataPreparation)
+# Modeling packages
+library(ranger)   # a c++ implementation of random forest 
+library(h2o)      # a java-based implementation of random forest
+
+
+options(warn = 1)
+options(warn = 1)
+set.seed(1113)
+
+
+smarket.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Smarket.csv", 
+           header=T, stringsAsFactors = F, na.strings = "?")
+
+str(smarket.df)
+# remove constant variables
+constant_cols <- whichAreConstant(smarket.df)
+
+# remove Variables that are in double (for example col1 == col2)
+(double_cols <- whichAreInDouble(smarket.df))
+
+# remove Variables that are exact bijections (for example col1 = A, B, B, A and col2 = 1, 2, 2, 1)
+(bijections_cols <- whichAreBijection(smarket.df))
+
+smarket.df <- if (!is.null(bijections_cols) & length(bijections_cols) > 0 ) 
+  smarket.df[- bijections_cols] else smarket.df
+
+smarket.df %>% 
+   filter_all(all_vars(is.na(.))) 
+
+# make sure no "NA is in the charachter column Direction"
+na.count <- smarket.df %>%
+  filter(Direction == "NA") %>%
+  nrow
+
+stopifnot(na.count != numeric(0))
+
+# make sure all are Either "Up" of #Down"
+
+ups <- smarket.df %>%
+  filter(Direction == "Up") %>%
+  nrow
+
+downs <- smarket.df %>%
+  filter(Direction == "Down") %>%
+  nrow
+
+stopifnot(identical(ups+downs, nrow(smarket.df)))
+
+smarket.df$Direction <- as.factor(smarket.df$Direction)
+
+str(smarket.df$Direction)
+
+# seems like "Up" -> 1 and "Down" -> 2
+head(smarket.df$Direction)
+head(as.integer(smarket.df$Direction))
+
+# split to train and test
+n <- nrow(smarket.df)
+no.of.train <- round(0.7*n, 3)
+train.idx <- sample(seq_len(n), no.of.train) 
+test.idx <- setdiff(seq_len(n), train.idx)
+
+stopifnot(identical(length(train.idx) + length(test.idx), n))
+
+train.df <- smarket.df[train.idx, ]
+test.df <- smarket.df[test.idx, ]
+
+
+# ----------------------------------------------
+# --------------- Random forest ----------------
+
+# By default, ranger sets the mtry parameter to  floor(sqrt(number of features)) 
+# however, for regression problems the preferred mtry to start with isfloor(number of features/3). 
+
+# We also set respect.unordered.factors = "order". This specifies how to treat 
+# unordered factor variables and we recommend setting this to “order”. 
+
+# number of features
+n_features <- length(setdiff(names(train.df), "Direction"))
+
+# train a default random forest model
+smarket_rf1 <- ranger(
+  Direction ~ ., 
+  data = train.df,
+  mtry = floor(sqrt(n_features)),
+  respect.unordered.factors = "order",
+  seed = 123
+)
+
+# get OOB RMSE
+(default_rmse <- sqrt(smarket_rf1$prediction.error))
+
+# The main hyperparameters to consider include:
+# ----------------------------------------------
+# _The number of trees in the forest
+# _The number of features to consider at any given split:  mtry (have the largest impact on predictive accuracy)
+# _The complexity of each tree (node size: one for classification and five for regression, 
+#   max depth, max number of terminal nodes, or the required node size to allow additional splits)
+# _The sampling scheme (by default each bootstrap copy has the same size as the original training data)
+#  if you have categories that are not balanced, sampling without replacement provides 
+#  a less biased use of all levels across the trees in the random forest.
+# _The splitting rule to use during tree construction (used primarily to increase computational efficiency)
+#  To increase computational efficiency, splitting rules can be randomized where only a random subset of 
+#  possible splitting values is considered for a variable. 
+#  If only a single random splitting value is randomly selected then we call this procedure extremely randomized trees. 
+#  Due to the added #  randomness of split points, this method tends to have no improvement, 
+# or often a negative impact, on predictive accuracy.
+
+# Let's do Cartesian grid searches where we assess every combination of hyperparameters of interest:
+hyper_grid <- expand.grid(
+  mtry = floor(n_features * c(.05, .15, .25, .333, .4)),
+  min.node.size = c(1, 3, 5, 10), 
+  replace = c(TRUE, FALSE),                               
+  sample.fraction = c(.5, .63, .8),                       
+  rmse = NA                                               
+)
+
+# execute full cartesian grid search
+for(i in seq_len(nrow(hyper_grid))) {
+  # fit model for ith hyperparameter combination
+  fit <- ranger(
+    formula         = Direction ~ ., 
+    data            = train.df, 
+    num.trees       = n_features * 10,
+    mtry            = hyper_grid$mtry[i],
+    min.node.size   = hyper_grid$min.node.size[i],
+    replace         = hyper_grid$replace[i],
+    sample.fraction = hyper_grid$sample.fraction[i],
+    verbose         = FALSE,
+    seed            = 123,
+    respect.unordered.factors = 'order',
+  )
+  # export OOB error 
+  
+  hyper_grid$rmse[i] <- sqrt(fit$prediction.error)
+}
+
+# assess top 10 models:
+hyper_grid %>%
+  arrange(rmse) %>%
+  mutate(perc_gain = (default_rmse - rmse) / default_rmse * 100) %>%
+  head(10)
+
+# seems like sampleing only 50% of train.df with replacements consistently performs the best.
+# Also mtry = 2 and min.node.size = 1 are good choices
+
+# ------------------- Fit Random forest with h2o ---------------------
+h2o.no_progress()
+h2o.init(ip = "localhost", port = 54321, nthreads= -1, max_mem_size = "10g")
+h2o.removeAll()
+
+h2o.train <- as.h2o(train.df)
+h2o.test <- as.h2o(test.df)
+response <- "Direction"
+predictors <- setdiff(colnames(train.df), response)
+
+# fit default randomforest model with h2o
+h2o.smarket_rf1 <- h2o.randomForest(
+  x = predictors,
+  y = response,
+  training_frame = h2o.train,
+  ntrees = n_features*10,
+  seed = 123
+)
+h2o.smarket_rf1
+
+# Let's perform a larger search with h2o
+
+hyper_grid <- list(
+  mtries = floor(n_features * c(.12,.15,.25,.333,.4)),
+  min_rows = c(1,3,5,10),
+  max_depth = c(10,20,30),
+  sample_rate = c(.55, .632, .70, .80)
+)
+
+# random grid search strategy (you must use list)
+search_criteria <- list(
+  strategy = "RandomDiscrete",
+  stopping_metric = "mse",
+  stopping_tolerance = 0.001,  # stop if improvement is less than 0.05% in over all OOB error
+  stopping_rounds = 10,       # over last 10 trees  
+  max_runtime_secs = 60*5    # or stop search after 5 minutes  
+)
+
+
+# perform grid search 
+grid <- h2o.grid(
+  algorithm = "randomForest",
+  grid_id = "rf_random_grid",
+  x = predictors, 
+  y = response,
+  training_frame = h2o.train,
+  hyper_params = hyper_grid,
+  ntrees = n_features*10,
+  stopping_metric = "RMSE",
+  stopping_rounds = 10,
+  stopping_tolerance = 0.005,
+  search_criteria = search_criteria,
+  seed = 123
+)
+
+# collect the results and sort by our model performance metric of choice
+grid_perf <- h2o.getGrid(
+  grid_id = "rf_random_grid", 
+  sort_by = "mse", 
+  decreasing = FALSE
+)
+
+# this is the best result:
+# max_depth -> 20, 	min_rows -> 1.0,	mtries -> 3, sample_rate ->	0.7 achieved at RMSE of 0.0028
+grid_perf
+
+
+# permutation-based Feature Importance measure: 
+# ----------------------------------------------  
+#   In the permutation-based approach, for each tree, the OOB sample is passed down 
+#   the tree and the prediction accuracy is recorded. Then the values for each variable 
+#   (one at a time) are randomly permuted and the accuracy is again computed. 
+#   The decrease in accuracy as a result of this randomly shuffling of feature values 
+#   is averaged over all the trees for each predictor. 
+#   The variables with the largest average decrease in accuracy are considered most important.
+
+# For ranger, once you’ve identified the optimal parameter values from the grid search, 
+# you will want to re-run your model with these hyperparameter values. 
+# You can also crank up the number of trees, which will help create more stables 
+# values of variable importance.
+
+# re-run model with impurity-based variable importance
+rf_impurity <- ranger(
+  formula = Direction ~ ., 
+  data = train.df, 
+  num.trees = 2000,
+  mtry = 3,
+  min.node.size = 1, # i.e. min_rows
+  sample.fraction = .80,
+  replace = TRUE,
+  importance = "impurity",
+  respect.unordered.factors = "order",
+  verbose = FALSE,
+  seed  = 123
+)
+
+# re-run model with permutation-based variable importance
+rf_permutation <- ranger(
+  formula = Direction ~ ., 
+  data = train.df, 
+  num.trees = 2000,
+  mtry = 3,
+  min.node.size = 1, # i.e. min_rows
+  sample.fraction = .80,
+  replace = TRUE,
+  importance = "permutation",
+  respect.unordered.factors = "order",
+  verbose = FALSE,
+  seed  = 123
+)
+
+# variable importance plot
+vip::vip(rf_impurity) 
+vip::vip(rf_permutation) 
+
+# seems like Today is most important feature in both plots
+
+  
+
+```
+
+
+```{r }
+library(tidyverse)
 (t <- tibble(x = c("", " NA", "12", "34", " NA", "NA", NA), y = c(NA, "qsfg", "fbf", "12", "NA", "NA ", NA)))
 (na.idx <- 
   t %>%
@@ -1606,6 +2817,9 @@ rest.idx <- setdiff(seq_len(nrow(t)) , na.idx)
 
 t[na.idx, ]
 t[rest.idx, ]
+
+
+# ------------------------
 
 ```
 
