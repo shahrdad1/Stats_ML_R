@@ -1,0 +1,1228 @@
+---
+title: "ISLR CH9 Exercises"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+
+---
+```{r Support vector classifer}
+
+library(tidyverse)       # for data wrangling
+library(dataPreparation)
+library(forcats)
+# Modeling packages
+
+library(e1071)
+set.seed(1)
+x <- matrix(rnorm(20*2), ncol=2)
+y <- c(rep(-1,10), rep(1,10))
+x[y==1,]=x[y==1, ] + 1
+
+# let's see if the classes are linearly separable'
+plot(x, col=(3-y))
+x
+# fit SVC (or SMC)
+(dat <- tibble(x1=x[,1], x2 = x[, 2], y=as.factor(y)))
+
+svmfit <- svm(y~.,data=dat, kernel="linear", cost=10, scale = F)
+
+# support vectors are marked as x
+plot(svmfit, dat)
+
+# indices of the observations that are support vectors
+svmfit$index
+
+summary(svmfit)
+
+# use smaller value of cost parameters
+
+svmfit <- svm(y~.,data=dat, kernel="linear", cost=0.1, scale = F)
+
+# support vectors are marked as x
+plot(svmfit, dat)
+
+# indices of the observations that are support vectors
+svmfit$index
+
+summary(svmfit)
+
+# we can use tune() to do the cross validation
+tune.out <- tune(svm,y~., data=dat, kernel="linear",
+                 ranges = list(cost=c(0.001, 0.01, 0.1,1,5,10,100)))
+
+summary(tune.out)
+
+# get the best modelfrom CV
+best.model <- tune.out$best.model
+summary(best.model)
+
+# Now lets predict using the our best Soft Margin Model
+x.test <- matrix(rnorm(20*2), ncol = 2)
+y.test <- sample(c(-1,1), 20, replace = T)
+x.test[y.test==1, ]=x.test[y.test==1, ]+1
+test.dat <- tibble(x1 = x.test[, 1], x2 = x.test[, 2], y=as.factor(y.test))
+y.pred <- predict(best.model, test.dat)
+#Confusion Matrix:
+(confusion_table <- table(y.pred, y.test))
+
+# Now let's consider the case where two classes are linearly separable
+x[y==1, ] <- x[y==1, ] + 0.5
+plot(x, col=(y+5)/2, pch = 19)
+(dat <- tibble(x1=x[,1], x2=x[,2], y = as.factor(y)))
+# we fit a Soft Margin classifier with large value of cost to prevent any missclassification
+svmfit <- svm(y~., data = dat , kernel="linear", cost=1)
+summary(svmfit)
+plot(svmfit, dat)
+```
+
+```{r Support vector machine}
+library(tidyverse)       # for data wrangling
+library(dataPreparation)
+library(forcats)
+library(ROCR)
+# Modeling packages
+library(e1071)
+set.seed(1311)
+x <- matrix(rnorm(200*2), ncol=2)
+x[1:100,] <- x[1:100,] + 2
+x[101:150,] <- x[101:150,] - 2
+y <- c(rep(1,150), rep(2,50))
+dat <- tibble(x1 = x[, 1], x2=x[,2], y = as.factor(y))
+
+plot(x, col=y)
+
+# split into train and test 
+train.idx <- sample(200,100)
+
+# fit the model
+svmfit <- svm(y~., data=dat[train.idx,], kernel="radial", gamma=1,cost=1)
+plot(svmfit, dat[train.idx,])
+summary(svmfit)
+
+# we see a few missclassified training data,we can increase cost at the risk of overfitting
+svmfit <- svm(y~., data=dat[train.idx,], kernel="radial", gamma=1,cost=1e5)
+plot(svmfit, dat[train.idx,])
+summary(svmfit)
+
+# Use tune to select the best choice of gamma and cost
+
+tune.out <- tune(svm, y~., data=dat[train.idx, ], kernel="radial", 
+                 ranges=list(cost=c(1e-2,1e-1,1e0,1e+1,1e+2,1e+3),
+                             gamma = c(0.1, 0.5, 1,2,3,4)))
+
+summary(tune.out)
+
+# get the best modelfrom CV
+best.model <- tune.out$best.model
+summary(best.model)
+test.dat <- dat[-train.idx, ]
+train.dat <- dat[train.idx, ]
+
+best.model <- tsvmfit <- svm(y~., data=train.dat, kernel="radial", gamma=3,cost=1)
+
+# get the predicted labes to be using in confusuin table
+y.hat <- predict(best.model, newdata = test.dat, decision.values=F)
+
+# decision.values = T gives us the result of equation 9.23 in the book (for ROC curve)
+y.pred <- predict(best.model, newdata = test.dat, decision.values=T)
+decision.values <- attributes(y.pred)$decision.values
+
+stopifnot(identical(length(y.hat), length(test.dat$y)))
+stopifnot(identical(length(decision.values), length(test.dat$y)))
+
+# use ROCR to draw AUC ROC 
+pred.ob <- prediction(decision.values, test.dat$y)
+str(pred.ob)
+perf <- performance(pred.ob, 'acc')
+perf@y.values
+
+pref <- performance(pred.ob, "tpr", "fpr")
+plot(pref, main="test data")
+
+perf <- performance(pred.ob, "prec", "rec")
+plot(perf)
+
+perf <- performance(pred.ob, "sens", "spec")
+plot(perf)
+
+#Confusion Matrix:
+(confusion_table <- table(y.hat, dat[-train.idx, ]$y))
+```
+
+
+```{r Support vector machine multiple classes}
+
+library(tidyverse)       # for data wrangling
+library(dataPreparation)
+library(forcats)
+# Modeling packages
+library(e1071)
+
+set.seed(1311)
+x <- matrix(rnorm(200*2), ncol=2)
+x[1:100,] <- x[1:100,] + 2
+x[101:150,] <- x[101:150,] - 2
+x <- rbind(x, matrix(rnorm(50*2), ncol=2))
+
+y <- c(rep(1,150), rep(2,50))
+y <- c(y, rep(0, 50))
+x[y==0,2] <- x[y==0, 2] + 2
+
+dat <- tibble(x1 = x[, 1], x2=x[,2], y = as.factor(y))
+
+plot(x, col=y+1)
+# performs multi class classification using one vs. one approcah
+svmfit <- svm(y~., data=dat, kernel="radial", cost=10, gamma = 1)
+plot(svmfit, dat)
+
+```
+```{r gene expression data}
+
+library(tidyverse)       # for data wrangling
+library(dataPreparation)
+library(forcats)
+# Modeling packages
+library(e1071)
+
+set.seed(1311)
+Khan_ytrain.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Khan_ytrain.csv", 
+           header=T, stringsAsFactors = F, na.strings = "?")
+
+Khan_ytest.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Khan_ytest.csv", 
+           header=T, stringsAsFactors = F, na.strings = "?")
+
+Khan_xtrain.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Khan_xtrain.csv", 
+           header=T, stringsAsFactors = F, na.strings = "?")
+
+Khan_xtest.df = 
+  read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Khan_xtest.csv", 
+           header=T, stringsAsFactors = F, na.strings = "?")
+
+Khan_ytrain.df %>% 
+   filter_all(all_vars(is.na(.))) 
+
+Khan_ytest.df %>% 
+   filter_all(all_vars(is.na(.))) 
+
+Khan_xtrain.df %>% 
+   filter_all(all_vars(is.na(.))) 
+
+Khan_xtest.df %>% 
+   filter_all(all_vars(is.na(.))) 
+
+Khan_ytest.df <- Khan_ytest.df %>% select (-1)
+Khan_ytrain.df <- Khan_ytrain.df %>% select(-1)
+Khan_xtest.df <- Khan_xtest.df %>% select(-1)
+Khan_xtrain.df <- Khan_xtrain.df %>% select(-1)
+
+dat_train <- cbind(Khan_xtrain.df, tibble(y = as.factor(Khan_ytrain.df$x)))
+
+# Since there are a very large number of features relative to observations we use linear kernel
+out <- svm(y~., data = dat_train, kernel="linear", cost=10)
+summary(out)
+
+table(out$fitted, dat_train$y)
+
+# The perfect separation is because it is easy to find an affine hyperplane that 
+# separates 60ish points in 2308 dimensinal Eucladian space
+# lets find the test performance
+
+dat_test <- cbind(Khan_xtest.df, tibble(y = as.factor(Khan_ytest.df$x)))
+
+# get the predicted labes to be using in confusuin table
+y.hat <- predict(out, newdata = dat_test, decision.values=F)
+
+# decision.values = T gives us the result of equation 9.23 in the book (for ROC curve)
+y.pred <- predict(out, newdata = dat_test, decision.values=T)
+decision.values <- attributes(y.pred)$decision.values
+y.24 <- decision.values[, 1]
+y.23 <- decision.values[, 2]
+y.21 <- decision.values[, 3]
+y.43 <- decision.values[, 4]
+y.41 <- decision.values[, 5]
+y.31 <- decision.values[, 6]
+
+stopifnot(identical(length(y.hat), length(dat_test$y)))
+stopifnot(identical(length(y.24), length(dat_test$y)))
+
+#Confusion Matrix:
+table(y.hat, dat_test$y)
+```
+
+```{r some ROCR}
+library(ROCR)
+data(ROCR.simple)
+pred <- prediction( ROCR.simple$predictions, ROCR.simple$labels)
+pred
+perf <- performance(pred,"tpr","fpr")
+perf
+plot(perf)
+```
+
+```{r Linrear SVM with nice plots technics}
+library(tidyverse)       # for data wrangling
+library(dataPreparation)
+library(forcats)
+# Modeling packages
+library(e1071)
+set.seed(10111)
+x <- matrix(data = rnorm(40), nrow = 20, ncol = 2)
+y <- rep(c(-1,1),c(10,10))
+
+# Let's draw 3d plots where vertical and horizantal axis are x[,1] and x[,2] 
+# value of y is shown as different colors :
+# col is color and y + 3 gives red -> y = -1 and blue for y = +1
+# we set the plotting character to 9 to give us nice little dots
+plot(x, col=y+3, pch = 19)
+
+# now for y's we shift the mean of x's correspond to y=1 one unit
+x[y==1, ] <- x[y==1, ] + 1
+plot(x, col=y+3, pch = 19)
+
+# convert our data into a tibble
+dat <- tibble(x1 = x[,1], x2 = x[, 2], y = as.factor(y))
+svmfit <- svm(y~., data = dat, kernel="linear", cost = 10, scale = F)
+print(svmfit)
+plot(svmfit, dat)
+
+# this plot sucks because it puts x1 on vertical and x2 on horizental axis
+# Let's make our own plot
+
+# --------------- How to make a good plot -------------------
+#
+# first make a 2D grid of x1 and x2
+
+make.grid <- function (df, n = 75){ # make 75 X 75 grid
+  grange.df <- df %>% select(x1, x2) %>% map_dfc(~ range(c(...)))
+  x1 <- seq(from=grange.df[1,]$x1, to=grange.df[2,]$x1, length=n)
+  x2 <- seq(from=grange.df[1,]$x2, to=grange.df[2,]$x2, length=n)
+  expand.grid(x1=x1,x2=x2) # Note the column name should be exactly the same as dataframe col names
+}
+
+xgrid <- make.grid(dat) 
+
+# next make the model predict on the data in xgrid
+ygrid <- predict(svmfit, xgrid)
+
+# now plot the predicted grid results
+plot(xgrid, col = c("red", "blue")[as.integer(ygrid)], pch=20, cex = .2) 
+
+# place the original points on existing plot
+points(x, col=y+3, pch = 19)
+
+# The svm model has component called "index" to provides index of support vectors
+points(x[svmfit$index,], pch=5, cex=2)
+
+# Note that coefficents only applied for linear models
+# let's extract the coefficients:
+beta <- drop(t(svmfit$coefs)%*%x[svmfit$index, ])
+beta0 <- svmfit$rho
+plot(xgrid, col=c("red", "blue")[as.integer(ygrid)], pch=20, cex = .2)
+points(x, col=y+3, pch = 19)
+points(x[svmfit$index,], pch=5, cex=2)
+# decision boundary
+abline(beta0/beta[2], -beta[1]/beta[2])
+
+# margins
+abline((beta0-1)/beta[2], -beta[1]/beta[2], lty=2)
+abline((beta0+1)/beta[2], -beta[1]/beta[2], lty=2)
+```
+
+
+```{r Non linear SVM with nice plots technics}
+library(tidyverse)       # for data wrangling
+library(dataPreparation)
+library(forcats)
+# Modeling packages
+library(e1071)
+load("/Users/shahrdadshadab/env/my-R-project/ESL.mixture.rda")
+names(ESL.mixture)
+
+rm(x,y)
+attach(ESL.mixture)
+
+# See the data 
+plot(x, col=y+1)
+dat = tibble(x1=x[,1], x2=x[,2], y=as.factor(y))
+dat
+fit <- svm(y~., data=dat, scale=F, kernel="radial", cost=5)
+
+# we are going to make a grid to make a prediction on grid
+xgrid <- expand.grid(x1=px1, x2=px2)
+
+# next make the model predict on the data in xgrid
+ygrid <- predict(fit, xgrid)
+
+# now plot the predicted grid results
+plot(xgrid, col = c("black", "red")[as.integer(ygrid)], pch=20, cex = .2) 
+
+# place the original points on existing plot
+points(x, col=y+1, pch = 19)
+
+# now we want our predicted function produce actual function estimates at out grid points
+func = predict(fit, xgrid, decision.values=T)
+str(func)
+func <- attributes(func)$decision
+str(attributes(func))
+
+# draw the grid again
+plot(xgrid, col = c("black", "red")[as.integer(ygrid)], pch=20, cex = .2) 
+
+# place the original points on existing plot
+points(x, col=y+1, pch = 19)
+
+# Use cotour function which gets the grid sequences and the function we got above 
+# to draw the contour of our decision function
+# Level=0 means gets the one that is farthest from the pick (ground 0)
+# add means add it to existing plot
+contour(px1, px2, matrix(func, length(px1), length(px2)), levels = 0, add = T)
+
+# Now compare this decision boundaru to perfect decision boundary which is Bayes decision boundary
+# To do that we use real probability of +1 in this data which is in 'prob' column of dataframe 
+# (the data is simulated) We plot true decision boundary at Level 0.5
+contour(px1, px2, matrix(prob, length(px1), length(px2)), levels = 0.5, add = T, col = "blue", lwd = 2)
+
+```
+
+
+```{r Exercise 4}
+library(tidyverse)      
+library(dataPreparation)
+library(forcats)
+library(ROCR)
+library(rsample)
+# Modeling packages
+library(kernlab)
+library(caret) 
+library(pROC)
+# Data creation
+set.seed(1311)
+x <- matrix(rnorm(200*2), ncol=2)
+x[1:100,] <- x[1:100,] + 2
+y <- c(rep(1,100), rep(2,100))
+dat <- tibble(x1 = x[, 1], x2=x[,2], y = as.factor(y))
+plot(x, col=y)
+
+# this is only for carts::train which does notlike to see numerics as labels
+y <- ifelse(y== 1, "No", "Yes")
+dat.cart <- tibble(x1 = x[, 1], x2=x[,2], y = as.factor(y))
+
+# first split to test and train
+set.seed(1854) 
+(dat_split <- initial_split(dat, prop = 0.7, strata = "y"))
+dat_train <- training(dat_split)
+dat_test  <- testing(dat_split)
+
+# for caret::train
+(dat.cart_split <- initial_split(dat.cart, prop = 0.7, strata = "y"))
+dat.caret_train <- training(dat.cart_split)
+dat.cart_test  <- testing(dat.cart_split)
+
+# ------------------------------------------
+# fit a svm with ploynomial kernel
+# ------------------------------------------
+
+# SVM with polynomial kernel with degree 3 on training data
+set.seed(1398)
+poly.svm <- ksvm(y ~ ., data = dat_train, kernel = "polydot",
+                 kpar = list(degree = 3, scale = 1, offset = 1), 
+                 C = Inf, cross = 5,
+                 prob.model = TRUE)
+plot(poly.svm,data=dat_train %>% select(-y))
+labels <- predict(poly.svm, dat_train)
+
+confusionMatrix(predict(poly.svm, dat_train), dat_train$y)
+
+pred <- predict(poly.svm, dat_train, type = "prob")[,1]
+ROC <- roc(dat_train$y, pred, levels = rev(levels(dat_train$y)))
+ROC
+plot(ROC)
+# AUC for polynomial kernel: 0.9871
+
+# ------------------------------------------
+# SVM with RBF kernel on training data
+# ------------------------------------------
+set.seed(1098)
+fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
+
+ctrlNoProb <- trainControl(method = "cv",
+                     classProbs = TRUE,
+                     summaryFunction = fiveStats)
+
+rbf_svm <- train(y ~ ., data = dat.caret_train,
+              "svmRadial",
+              preProcess = c("center", "scale"),  
+              trControl = ctrlNoProb,
+              tuneLength = 10,
+              metric = "ROC") # We trained the model using AUC
+
+ggplot(rbf_svm) + theme_light()
+
+plot(rbf_svm)
+rbf_svm
+rbf_svm$results
+
+confusionMatrix(predict(rbf_svm, dat.caret_train), dat.caret_train$y)
+rbf_svm.pred <- predict(rbf_svm, dat.caret_train, type = "prob")[,1]
+rbf_svm.ROC <- roc(dat.caret_train$y, rbf_svm.pred,
+               levels = rev(levels(dat.caret_train$y)))
+rbf_svm.ROC
+plot(rbf_svm.ROC)
+
+# Area under the curve for rbf: 0.958
+
+# ------------------------------------------
+# Support Vector classifier (linear kernel)
+# -------------------------------------------
+
+# SVC linear kernel
+fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
+
+ctrlNoProb <- trainControl(method = "cv",
+                     classProbs = TRUE,
+                     summaryFunction = fiveStats)
+
+svc <- train(y ~ ., data = dat.caret_train, 
+             method = "svmLinear", trControl = ctrlNoProb,  preProcess = c("center","scale"))
+
+svc
+svc$results
+
+confusionMatrix(predict(svc, dat.caret_train), dat.caret_train$y)
+svc.pred <- predict(svc, dat.caret_train, type = "prob")[,1]
+svc.ROC <- roc(dat.caret_train$y, svc.pred,
+               levels = rev(levels(dat.caret_train$y)))
+svc.ROC
+
+# Area under the curve for support vector classifier : 0.9784
+
+# it looks polynomial kernel beats both linear and RBF on training data
+# Let's take the performance on test data:
+
+# Area under the curve for polynomial test data: 0.9789
+labels <- predict(poly.svm, dat_test)
+pred <- predict(poly.svm, dat_test, type = "prob")[,1]
+ROC <- roc(dat_test$y, pred, levels = rev(levels(dat_test$y)))
+ROC
+
+
+# Area under the curve for SVM with RBF kernel on test data: 0.9889
+rbf_svm.pred <- predict(rbf_svm, dat.cart_test, type = "prob")[,1]
+rbf_svm.ROC <- roc(dat.cart_test$y, rbf_svm.pred,
+               levels = rev(levels(dat.cart_test$y)))
+rbf_svm.ROC
+
+# Area under the curve for SVC on test data : 0.9822
+x <- as.matrix(dat_test %>% select(-y))
+labels <- predict(svc, x)
+pred <- predict(svc, x, type = "prob")[,1]
+ROC <- roc(dat_test$y, pred, levels = rev(levels(dat_test$y)))
+ROC
+```
+
+```{r Exercise 5}
+library(tidyverse)      
+library(dataPreparation)
+library(forcats)
+library(ROCR)
+library(rsample)
+# Modeling packages
+library(kernlab)
+library(caret) 
+library(pROC)
+# a) generate data set
+set.seed(1311)
+
+x1 <- runif(500) - 0.5
+x2 <- runif(500) - 0.5
+y <- 1*(x1^2-x2^2 > 0)
+
+dat <- tibble(x1 = x1, x2=x2, y = as.factor(y))
+x <- as.matrix(dat %>% select(-y))
+
+# b) plot observation
+plot(x, col=y+2)
+
+# split to test and train
+# first split to test and train
+set.seed(1984) 
+(dat_split <- initial_split(dat, prop = 0.7, strata = "y"))
+
+dat_train <- training(dat_split)
+dat_test  <- testing(dat_split)
+
+# c) fit logistic regression to x1 and x2
+fit_glm <- glm(y ~ ., data = dat_train, family = binomial)
+
+
+# Let's apply this model to training data 
+prob_glm <- predict(fit_glm, newdata = dat_train, type = "response")
+
+ROC <- roc(dat_train$y, prob_glm, levels = rev(levels(dat_train$y)))
+ROC
+# plot(ROC)
+
+# Remeber logistic regression always returns Pr(Y=1|X) 
+# lets put the probabilities along side the response original value and response factor value
+tibble(preb = prob_glm, response.org=as.integer(dat_train$y), response.fact=dat_train$y)
+y.hat.int <- ifelse(prob_glm >=0.5, 1, 0)
+predicted.df <- tibble(x1 = dat_train$x1, x2 = dat_train$x2, y=as.factor(y.hat.int))
+
+prob_glm <- cbind("1" = 1 - prob_glm, "2" = prob_glm)
+
+
+# d) Apply logistic regression to form part c to training data and plot the prediction and decision boundary
+slope <- coef(fit_glm)[2]/(-coef(fit_glm)[3])
+intercept <- coef(fit_glm)[1]/(-coef(fit_glm)[3]) 
+
+library(lattice)
+xyplot( x2 ~ x1 , data = predicted.df, groups = y,
+   panel=function(...){
+       panel.xyplot(...)
+       panel.abline(intercept , slope)
+       panel.grid(...)
+       })
+
+# e) Now let's use logistic regression with nonlinear expression
+ 
+fit_glm <- glm(y ~ I(sin(x1*x2)), data = dat_train, family = binomial)
+
+
+# f) Let's apply this model to training data and plot the predicted points and decision boundary
+prob_glm <- predict(fit_glm, newdata = dat_train, type = "response")
+ROC <- roc(dat_train$y, prob_glm, levels = rev(levels(dat_train$y)))
+ROC
+# plot(ROC)
+
+# Remeber logistic regression always returns Pr(Y=1|X) 
+# lets put the probabilities along side the response original value and response factor value
+tibble(preb = prob_glm, response.org=as.integer(dat_train$y), response.fact=dat_train$y)
+y.hat.int <- ifelse(prob_glm >=0.5, 1, 0)
+
+
+
+# Plot decision boundary:
+
+# step 1: create a grid from predictors x1 and x2
+grange.df <- dat_train %>% select(x1, x2) %>% map_dfc(~ range(c(...)))
+px1 <- seq(from=grange.df[1,]$x1, to=grange.df[2,]$x1, length=75)
+px2 <- seq(from=grange.df[1,]$x2, to=grange.df[2,]$x2, length=75)
+xgrid <- expand.grid(x1=px1,x2=px2) # Note the column name should be exactly the same as dataframe col names
+
+# step 2) make the model predict on the data in xgrid
+ygrid.prob.dbl <- predict(fit_glm, xgrid)
+ygrid.vec <- ifelse(ygrid.prob.dbl >=0.5, 1, 0)
+
+# step 3) plot the original points on existing plot
+plot(dat_train %>% select(-y), col=y.hat.int+3)
+
+# step 4) plot the contour using grid sequences and predicted grid
+contour(px1, px2, matrix(ygrid.prob.dbl, length(px1), length(px2)), levels = 0, add = T)
+
+
+# g) Let's fit support vector classifier and draw the predictions
+
+# for caret::train response must be of character type
+y.int <- as.integer(dat_train$y)
+y.char <- ifelse(y.int== 1, "No", "Yes")
+dat.caret_train <- tibble(x1 = dat_train$x1, x2=dat_train$x2, y = as.factor(y.char))
+
+
+# SVC linear kernel
+fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
+
+ctrlNoProb <- trainControl(method = "cv",
+                     classProbs = TRUE,
+                     summaryFunction = fiveStats)
+
+svc <- train(y ~ ., data = dat.caret_train, 
+             method = "svmLinear", trControl = ctrlNoProb,  preProcess = c("center","scale"))
+
+svc
+svc$results
+
+pred.fact <- predict(svc, dat.caret_train)
+
+# This is requiered for plot
+y.hat.int <- ifelse(as.character(pred.fact)== "No", 1, 2)
+pred.list <- predict(svc, dat.caret_train, type = "prob")
+svc.ROC <- roc(dat.caret_train$y, pred.list[, 1],
+               levels = rev(levels(dat.caret_train$y)))
+svc.ROC
+
+# Let's plot decision boundary using contour
+
+# step 1: create a grid from predictors x1 and x2
+grange.df <- dat.caret_train %>% select(x1, x2) %>% map_dfc(~ range(c(...)))
+px1 <- seq(from=grange.df[1,]$x1, to=grange.df[2,]$x1, length=75)
+px2 <- seq(from=grange.df[1,]$x2, to=grange.df[2,]$x2, length=75)
+xgrid.df <- expand.grid(x1=px1,x2=px2) # Note the column name should be exactly the same as dataframe col names
+
+# step 2) make the model predict on the data in xgrid.df
+y.grid.fact <- predict(svc, xgrid.df)
+y.grid.int <- as.integer(y.grid.fact)
+ygrid.prob.list <- predict(svc, xgrid.df, type = "prob")
+
+# step 3) plot the original points on existing plot
+plot(dat_train %>% select(-y), col=y.hat.int+2)
+
+# step 4) plot the contour using grid sequences and predicted grid
+contour(px1, px2, matrix(ygrid.prob.list[, 2], length(px1), length(px2)), levels = 0.5, add = T)
+
+
+# h) Finally Let's fit support vector Machine with RBF
+
+set.seed(1098)
+
+rbf_svm <- train(y ~ ., data = dat.caret_train,
+              "svmRadial",
+              preProcess = c("center", "scale"),  
+              trControl = ctrlNoProb,
+              tuneLength = 10,
+              metric = "ROC") # We trained the model using AUC
+
+ggplot(rbf_svm) + theme_light()
+
+# plot(rbf_svm)
+rbf_svm
+rbf_svm$results
+
+pred.fact <- predict(rbf_svm, dat.caret_train)
+
+# This is requiered for plot
+y.hat.int <- ifelse(as.character(pred.fact)== "No", 1, 2)
+pred.list <- predict(rbf_svm, dat.caret_train, type = "prob")
+rbf_svm.ROC <- roc(dat.caret_train$y, pred.list[, 1],
+               levels = rev(levels(dat.caret_train$y)))
+rbf_svm.ROC
+
+# Let's plot decision boundary using contour
+
+# step 1: create a grid from predictors x1 and x2
+grange.df <- dat.caret_train %>% select(x1, x2) %>% map_dfc(~ range(c(...)))
+px1 <- seq(from=grange.df[1,]$x1, to=grange.df[2,]$x1, length=75)
+px2 <- seq(from=grange.df[1,]$x2, to=grange.df[2,]$x2, length=75)
+xgrid.df <- expand.grid(x1=px1,x2=px2) # Note the column name should be exactly the same as dataframe col names
+
+# step 2) make the model predict on the data in xgrid.df
+y.grid.fact <- predict(rbf_svm, xgrid.df)
+y.grid.int <- as.integer(y.grid.fact)
+ygrid.prob.list <- predict(rbf_svm, xgrid.df, type = "prob")
+
+# step 3) plot the original points on existing plot
+plot(dat_train %>% select(-y), col=y.hat.int+2)
+
+# step 4) plot the contour using grid sequences and predicted grid
+contour(px1, px2, matrix(ygrid.prob.list[, 1], length(px1), length(px2)), levels = 0.5, add = T)
+
+```
+
+```{r Exercise 6}
+library(tidyverse)      
+library(dataPreparation)
+library(forcats)
+library(ROCR)
+library(rsample)
+# Modeling packages
+library(kernlab)
+library(caret) 
+library(pROC)
+
+
+# a) generate data set, plot observation and split the test and train
+set.seed(1311)
+
+x1 <- runif(500) - 0.5
+x2 <- runif(500) - 0.5
+y <- 1*(x1^2-x2^2 > 0)
+dat <- tibble(x1 = x1, x2=x2, y = as.factor(y))
+x <- as.matrix(dat %>% select(-y))
+
+plot(x, col=y+2)
+
+# split to test and train
+# first split to test and train
+set.seed(1984) 
+(dat_split <- initial_split(dat, prop = 0.7, strata = "y"))
+
+dat_train <- training(dat_split)
+dat_test  <- testing(dat_split)
+
+y.char <- ifelse(as.integer(dat_train$y)== 1, "No", "Yes")
+dat.caret_train <- tibble(x1 = dat_train$x1, x2=dat_train$x2, y = as.factor(y.char))
+
+y.char <- ifelse(as.integer(dat_test$y)== 1, "No", "Yes")
+dat.caret_test <- tibble(x1 = dat_test$x1, x2=dat_test$x2, y = as.factor(y.char))
+
+# b) fit svc and compute CV error for C values
+set.seed(1308)
+fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
+
+ctrlNoProb <- trainControl(method = "cv",
+                     classProbs = TRUE,
+                     summaryFunction = fiveStats)
+
+svmGrid <- data.frame(C=seq(from=0.1,1,length=20))
+
+svc <- train(y ~ ., data = dat.caret_train, 
+             method = "svmLinear", tuneGrid=svmGrid, 
+             trControl = ctrlNoProb,  preProcess = c("center","scale"),
+              tuneLength = 10, metric = "ROC")
+
+svc
+
+# Let's train an SVC model for each cost value and find number of 
+# missclassification training data
+result.df <- svc$results
+miss.classifications <- tibble(cost = NULL, ROC = NULL, Accuracy = NULL, miss.class = NULL)
+for (cost in result.df$C){
+  
+  svc.cost <- train(y ~ ., data = dat.caret_train, 
+             method = "svmLinear", tuneGrid=data.frame(C=c(cost)),
+             trControl = ctrlNoProb,  preProcess = c("center","scale"),
+              tuneLength = 10, metric = "ROC")
+  
+  svc.cost
+  cfx.cost <- confusionMatrix(predict(svc.cost, dat.caret_train), dat.caret_train$y)
+  miss.classifications <- 
+    rbind(miss.classifications ,
+          tibble(cost = cost, ROC = result.df[result.df$C==cost,]$ROC ,
+                 Accuracy = result.df[result.df$C==cost,]$Accuracy,
+                 miss.class = cfx.cost$table[1,2] + cfx.cost$table[2,1]))
+}
+
+miss.classifications
+
+
+ggplot(data=miss.classifications, aes(x=cost, y=miss.class, group=1)) +
+  labs(title="Cost against missclassification for training data") +
+  geom_line(linetype = "dashed")+
+  geom_point()
+# c) Compute the test errors on corrsponding to each value of costs
+
+result.df <- svc$results
+miss.classifications.test <- tibble(cost = NULL, ROC = NULL, Accuracy = NULL, miss.class = NULL)
+for (cost in result.df$C){
+  
+  svc.cost <- train(y ~ ., data = dat.caret_train, 
+             method = "svmLinear", tuneGrid=data.frame(C=c(cost)),
+             trControl = ctrlNoProb,  preProcess = c("center","scale"),
+              tuneLength = 10, metric = "ROC")
+  
+  svc.cost
+  cfx.cost <- confusionMatrix(predict(svc.cost, dat.caret_test), dat.caret_test$y)
+  miss.classifications.test <- 
+    rbind(miss.classifications.test ,
+          tibble(cost = cost, ROC = result.df[result.df$C==cost,]$ROC ,
+                 Accuracy = result.df[result.df$C==cost,]$Accuracy,
+                 miss.class = cfx.cost$table[1,2] + cfx.cost$table[2,1]))
+}
+
+miss.classifications.test
+
+
+ggplot(data=miss.classifications.test, aes(x=cost, y=miss.class, group=1)) +
+  labs(title="Cost against missclassification for test data") +
+  geom_line(linetype = "dashed")+
+  geom_point()
+
+# On training data with cost value 0.7631579 we get only 127 missclassification
+# whereas with cost value 0.5263158	we get only	52 miss classified data on trainimng set
+# Thus smaller cost that may cause missclassification on training data has less
+# classification error on test data comparing with larger cost valuse that 
+# leads to less missclassification on training data.
+
+```
+```{r Exercise 7}
+
+library(tidyverse)      
+library(dataPreparation)
+library(forcats)
+library(ROCR)
+library(rsample)
+# Modeling packages
+library(kernlab)
+library(caret) 
+library(pROC)
+
+auto.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/Auto.csv", 
+                   header=T, stringsAsFactors = F, na.strings = "?")
+
+auto.df.original = tibble(auto.df)
+auto.df = tibble(auto.df)
+auto.df$name <- as.factor(auto.df$name) 
+auto.df <- na.omit(auto.df)
+
+# identify near zero variables
+nearZeroVar(auto.df, saveMetrics= TRUE)
+
+# Identify correlated variables
+auto.df.numeric <- auto.df %>% select (c(-mpg, -name))
+descrCor <- auto.df.numeric %>% cor
+summary(descrCor[upper.tri(descrCor)])
+
+# remove descriptors with absolute correlation > 75%
+(highlyCorDescr <- findCorrelation(descrCor, cutoff = .75))
+(filteredDescr <- auto.df.numeric[,-highlyCorDescr])
+descrCor2 <- cor(filteredDescr)
+summary(descrCor2[upper.tri(descrCor2)])
+
+# a) create binary var
+str(auto.df)
+mpg.median <- median(auto.df$mpg)
+auto.df$mpg <- ifelse(auto.df$mpg > mpg.median, "Yes", "No")
+auto.df$mpg <- as.factor(auto.df$mpg)
+tibble(auto.df$mpg, as.numeric(auto.df$mpg)) %>% head(30)
+
+# b) fit support vector classifier
+set.seed(1308)
+fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
+
+ctrlNoProb <- trainControl(method = "cv",
+                     classProbs = TRUE,
+                     summaryFunction = fiveStats)
+
+svmGrid <- data.frame(C=seq(from=0.01,1,length=20))
+
+svc <- train(mpg ~ ., data = auto.df, 
+           method = "svmLinear", tuneGrid=svmGrid,
+           trControl = ctrlNoProb,  preProcess = c("center","scale"),
+            tuneLength = 10, metric = "ROC")
+
+(result.df <- svc$results)
+result.df[which.max(result.df$ROC), ]
+
+# clearly up to cost value = 4 , ROC increases steadily , then it jiggles and then decreases
+
+ggplot(svc) + theme_light()
+
+
+
+# b) Repeat b with radial kernel
+set.seed(1098)
+
+# kernlab::sigset() uses the train data to choose the good estimates for sigma
+sigma <- sigest(mpg ~ ., data = auto.df, frac = .75)
+names(sigma) <- NULL
+svmGrid <- expand.grid(sigma = sigma,C = 2^c(2:10))
+
+set.seed(1401)
+svmWtFit <- train(mpg ~ .,
+                  data = auto.df,
+                  method = "svmRadial",
+                  tuneGrid = svmGrid,
+                  preProc = c("center", "scale"),
+                  metric = "ROC", # we trained the model using AUC
+                  trControl = ctrlNoProb)
+ggplot(svmWtFit) + theme_light()
+
+
+(result.df <- svmWtFit$results)
+result.df[which.max(result.df$Accuracy), ]
+
+(cost_sigma.vs.cv_error <- tibble(C = result.df$C, sigma = result.df$sigma, ROC = result.df$ROC))
+result.df[which.max(result.df$ROC),]
+# As cost increases sigma , given a fixed value of sigma, ROC decreases 
+# This decrease has different rates for different value of sigma
+
+
+
+# Repeat b with polynimial kernel with degree d
+
+set.seed(1098)
+
+
+
+Cs = 2^c(2:10)
+degrees <- 2:10
+results <- tibble(C=NULL, degree = NULL, cv.error = NULL)
+for (degree in degrees){
+  for (C in Cs){
+      poly.svm <- ksvm(mpg ~ ., data = auto.df, kernel = "polydot",
+                   kpar = list(degree = degree, scale = 1, offset = 1), C=C, cross = 5,
+                   prob.model = F) 
+    results <- rbind(results, tibble(C=C, degree = degree, cv.error = attributes(poly.svm)$cross))
+
+  }
+}
+# Higher degrees causes higher cv.error Also for C < 125 we get more lower errors
+results
+ggplot(data = results, mapping = aes(x = C, y = cv.error)) +
+    geom_point(alpha = 1, aes(color = degree))
+
+
+```
+
+```{r Exercise 8}
+library(tidyverse)       # for data wrangling
+library(dataPreparation)
+library(forcats)
+library(rsample)  # for data splitting
+
+# Modeling packages
+library(caret)    # for classification and regression training
+library(kernlab)  # for fitting SVMs
+
+# Model interpretability packages
+library(pdp)      # for partial dependence plots, etc.
+library(vip)      # for variable importance plots
+library(pROC)
+
+options(warn = 1)
+
+oj.df <- read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/orange_juice_withmissing.csv", header=T, stringsAsFactors = F, na.strings = "?")
+oj.df <- tibble(oj.df)
+
+# first split to test and train
+set.seed(1854)  # for reproducibility
+oj_split <- initial_split(oj.df, prop = 0.7, strata = "Purchase")
+oj_train.org <- training(oj_split)
+oj_test.org  <- testing(oj_split)
+str(oj_train.org)
+# We need some massaging
+fix.oj <- function(df){
+  df.y <- df %>% select(Purchase) %>% mutate_if(is.character, factor, ordered = FALSE)
+  df.Store7 <- df %>% select(Store7) %>% mutate_if(is.character, factor, ordered = FALSE)
+
+  df.x <- 
+    df %>%
+    select(c(-1, -14)) %>% 
+    mutate_if(is.character, ~as.numeric(as.character(.)), na.rm = TRUE) 
+
+  cbind(df.y, df.x, df.Store7) %>% na.omit
+}
+
+oj_train <- fix.oj(oj_train.org)
+oj_test <- fix.oj(oj_test.org)
+
+# ommited NA:
+nrow(oj.df) - nrow(oj_train) + nrow(oj_test)
+
+fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
+
+ctrlNoProb <- trainControl(method = "cv",
+                     classProbs = TRUE,
+                     summaryFunction = fiveStats)
+
+
+# b) SVC with C = 0.01 
+set.seed(1410)
+
+svc <- train(Purchase ~ ., data = oj_train,
+           method = "svmLinear", tuneGrid=data.frame(C=c(0.01)),
+           trControl = ctrlNoProb,  preProcess = c("center","scale"),
+            tuneLength = 10, metric = "ROC")
+
+
+  # ROC        Sens       Spec       Accuracy   Kappa    
+  # 0.8993194  0.8791414  0.7671958  0.8358399  0.6516432
+
+svc
+
+
+
+# c) Test error rate: 
+confusionMatrix(predict(svc, oj_test), oj_test$Purchase)
+oj.pred <- predict(svc, oj_test, type = "prob")[,1]
+oj.ROC <- roc(oj_test$Purchase, oj.pred,
+               levels = rev(levels(oj_test$Purchase)))
+
+# Area under the curve: 0.8884
+oj.ROC
+
+
+
+# d) select optimal costs for C in range 0.01 to 10
+set.seed(1308)
+fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
+
+ctrlNoProb <- trainControl(method = "cv",
+                     classProbs = TRUE,
+                     summaryFunction = fiveStats)
+
+svmGrid <- data.frame(C=seq(from=0.01,10,length=20))
+
+svc1 <- train(Purchase ~ ., data = oj_train,
+           method = "svmLinear", tuneGrid=svmGrid,
+           trControl = ctrlNoProb,  preProcess = c("center","scale"),
+            tuneLength = 10, metric = "ROC")
+
+# The final value used for the model was C = 1.061579.
+svc1
+
+(result.df <- svc1$results)
+result.df[which.max(result.df$ROC), ]
+
+
+# e) Test error rate for the chosen cost C = 1.061579.
+
+confusionMatrix(predict(svc1, oj_test), oj_test$Purchase)
+oj.pred <- predict(svc1, oj_test, type = "prob")[,1]
+oj.ROC <- roc(oj_test$Purchase, oj.pred,
+               levels = rev(levels(oj_test$Purchase)))
+
+# Area under the curve: 0.8918
+oj.ROC
+
+
+
+# f) Repeat parts b through e using SVM with Radial kernel
+
+set.seed(1500)
+
+svc3 <- ksvm(Purchase ~ ., data = oj_train,kernel="rbfdot",
+               kpar=list(sigma=0.01),C=0.01,prob.model = TRUE)
+
+# Training error : 0.385359 
+svc3
+
+
+# Test error rate: 
+confusionMatrix(predict(svc3, oj_test), oj_test$Purchase)
+oj.pred <- predict(svc3, oj_test, type = "prob")[,1]
+oj.ROC <- roc(oj_test$Purchase, oj.pred,
+               levels = rev(levels(oj_test$Purchase)))
+
+# Area under the curve: 0.873
+oj.ROC
+
+
+
+#  select optimal costs for C in range 0.01 to 10
+set.seed(1308)
+fiveStats <- function(...) c(twoClassSummary(...), defaultSummary(...))
+sigma <- sigest(Purchase ~ ., data = oj_train, frac = .75)
+names(sigma) <- NULL
+svmGrid <- data.frame(sigma = sigma[2],C=seq(from=0.01,10,length=20))
+ctrlNoProb <- trainControl(method = "cv",
+                     classProbs = TRUE,
+                     summaryFunction = fiveStats)
+
+svc4 <- train(Purchase ~ .,
+                  data = oj_train,
+                  method = "svmRadial",
+                  tuneGrid = svmGrid,
+                  preProc = c("center", "scale"),
+                  metric = "ROC", 
+                  trControl = ctrlNoProb)
+
+# The final values used for the model were sigma = 0.03806035 and C = 0.5357895
+svc4
+
+# Test error rate for the chosen cost C = 0.5357895.
+
+confusionMatrix(predict(svc4, oj_test), oj_test$Purchase)
+oj.pred <- predict(svc4, oj_test, type = "prob")[,1]
+oj.ROC <- roc(oj_test$Purchase, oj.pred,
+               levels = rev(levels(oj_test$Purchase)))
+
+# Area under the curve: 0.8901
+oj.ROC
+
+
+# g) Repeat parts b through e using SVM with polynomial kernel degree=2
+
+set.seed(1398)
+svc6 <- ksvm(Purchase ~ .,
+                 data = oj_train, kernel = "polydot",
+                 kpar = list(degree = 2, scale = 1, offset = 1), 
+                 C = 0.01,
+                 cross = 5,
+                 prob.model = TRUE)
+
+# Training error :  0.145028
+svc6
+
+
+# Test error rate: 
+confusionMatrix(predict(svc6, oj_test), oj_test$Purchase)
+oj.pred <- predict(svc6, oj_test, type = "prob")[,1]
+oj.ROC <- roc(oj_test$Purchase, oj.pred,
+               levels = rev(levels(oj_test$Purchase)))
+
+# Area under the curve: 0.8665
+oj.ROC
+
+#  select optimal costs for C in range 0.01 to 10
+set.seed(1098)
+Cs =seq(from=0.01,10,length=20)
+results <- tibble(C=NULL, cv.error = NULL)
+for (C in Cs){
+    poly.svm <- ksvm(Purchase ~ .,
+                 data = oj_train, kernel = "polydot",
+                 kpar = list(degree = 2, scale = 1, offset = 1), C=C, cross = 5,
+                 prob.model = T) 
+    
+    results <- rbind(results, tibble(C=C, cv.error = attributes(poly.svm)$cross))
+
+}
+
+best.C <- results [which.min(results$cv.error), ]$C
+
+sv7 <- ksvm(Purchase ~ .,
+             data = oj_train, kernel = "polydot",
+             kpar = list(degree = 2, scale = 1, offset = 1), C=best.C, cross = 5,
+             prob.model = T) 
+
+# Test error rate for the chosen cost C = 0.5357895.
+
+confusionMatrix(predict(sv7, oj_test), oj_test$Purchase)
+oj.pred <- predict(sv7, oj_test, type = "prob")[,1]
+oj.ROC <- roc(oj_test$Purchase, oj.pred,
+               levels = rev(levels(oj_test$Purchase)))
+
+# Area under the curve: 0.8795
+oj.ROC
+
+
+# h) Overall the best model is SVM with radial basis with AUC = 0.89
+
+```
+
+
+
+```{r}
+# geom_bar is designed to make it easy to create bar charts that show
+# counts (or sums of weights)
+g <- ggplot(mpg, aes(class))
+# Number of cars in each class:
+g + geom_bar()
+# Total engine displacement of each class
+g + geom_bar(aes(weight = displ))
+# Map class to y instead to flip the orientation
+ggplot(mpg) + geom_bar(aes(y = class))
+
+# Bar charts are automatically stacked when multiple bars are placed
+# at the same location. The order of the fill is designed to match
+# the legend
+g + geom_bar(aes(fill = drv))
+
+# If you need to flip the order (because you've flipped the orientation)
+# call position_stack() explicitly:
+ggplot(mpg, aes(y = class)) +
+ geom_bar(aes(fill = drv), position = position_stack(reverse = TRUE)) +
+ theme(legend.position = "top")
+
+# To show (e.g.) means, you need geom_col()
+df <- data.frame(trt = c("a", "b", "c"), outcome = c(2.3, 1.9, 3.2))
+ggplot(df, aes(trt, outcome)) +
+  geom_col()
+# But geom_point() displays exactly the same information and doesn't
+# require the y-axis to touch zero.
+ggplot(df, aes(trt, outcome)) +
+  geom_point()
+
+# You can also use geom_bar() with continuous data, in which case
+# it will show counts at unique locations
+df <- data.frame(x = rep(c(2.9, 3.1, 4.5), c(5, 10, 4)))
+ggplot(df, aes(x)) + geom_bar()
+# cf. a histogram of the same data
+ggplot(df, aes(x)) + geom_histogram(binwidth = 0.5)
+
+```
+

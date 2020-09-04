@@ -1760,7 +1760,7 @@ flights %>%
 
 # mutate function with group
 # Arithmetic operators with group_by
-flights %>%
+
   
  
 ```
@@ -1952,40 +1952,6 @@ apply(df, 1, function(x) length(which(is.na(x))))
 
 
 
-
-# ----------------- Use imputation to predict values for NAs ------------------
-# Use predictive models using the known features in order to estimates the missing features.
-# When imputing values, it is important that the test data are not used 
-library(Hmisc)
-
-# use aregImpute for multiple imputation
-imputed <- aregImpute(y ~ x, df, group=df$y , pr = FALSE)
-
-# Note that aregImpute makes several multiple imputations with different bootstrap samples, 
-# which can be specified using the n.impute parameter. Since we want to use the imputations 
-# from all runs rather than a single one, we will use the fit.mult.impute function to define our model:
-
-
-# list.out: return a list; imputation: arbitrarily use the first imputation
-imputed.data <- as.data.frame(impute.transcan(imputed, data = df,
-                imputation = 1, list.out = TRUE,  pr = FALSE))
-
-# compute new weights
-weights <- get.weights(imputed.data)
-
-# use imputations from all iterations rather than an arbitrary iteration:
-fmi <- fit.mult.impute(y ~ x,
-        fitter=glm, xtrans = imputed, family = "poisson", 
-        data = df, subset = trainset, pr = FALSE) #, weights = weights)
-        # weights arguments (weights = weights) not used due to error:
-        # "..2 used in an incorrect context, no ... to look in"
-fmi.preds <- predict.glm(fmi, newdata = df[testset,], type = "response") 
-plot.linear.model(fmi, fmi.preds, df$y[testset])
-
-# inspect imputed observations with respect to the outcome 
-summary(as.numeric(imputed.data$df))
-
-
 ```
 ```{r}
 # -------------  density: computes kernel density estimates. -------------
@@ -2041,7 +2007,7 @@ confint(model)
 pred.values <- predict(model, newdata = carseats.df[test.idx, ])
 obs.values <- carseats.df[test.idx, ]$Sales
 
-# find the R^2 for test data
+# find the R2 for test data
 (R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
 
 # R squared is 0.411 which is not great!
@@ -2155,7 +2121,7 @@ pred.values <- predict(pois.model, newdata = carseats.df[test.idx, ],
                       type = "response") 
 obs.values <- carseats.df[test.idx, ]$Sales
 
-# find the R^2 for test data
+# find the R2 for test data
 (R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
 
 # R squared is 0.426 which is slightly improved
@@ -2197,7 +2163,7 @@ pois.model.with.weights  <- glm(Sales ~ CompPrice + Income + Price ,
             weights = sales.weights)
 
 #Let's see the p-values
-coef(summary(neg.bin.model.with.weights))
+coef(summary(pois.model.with.weights))
 # p-values shows all predictors are statistically significant
 
 
@@ -2212,7 +2178,7 @@ pred.values <- predict(pois.model.with.weights, newdata = carseats.df[test.idx, 
                       type = "response")
 obs.values <- carseats.df[test.idx, ]$Sales
 
-# find the R^2 for test data
+# find the R2 for test data
 (R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
 
 # R squared is 0.425 which is back to what is was
@@ -2273,7 +2239,7 @@ pred.values <- predict(pois.model.with.weights, newdata = carseats.df[test.idx, 
                       type = "response")
 obs.values <- carseats.df[test.idx, ]$Sales
 
-# find the R^2 for test data
+# find the R2 for test data
 (R.squared <- round((cor(pred.values, obs.values) ^ 2), 3))
 
 # R squared is 0.425 which is back to what is was
