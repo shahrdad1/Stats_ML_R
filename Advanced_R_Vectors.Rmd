@@ -1,10 +1,9 @@
 ---
 title: "Advancer R Vectors"
-output: html_notebook
+output: 
+  pdf_document: default
+  html_notebook: default
 ---
-
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
 
 ```{r two family of data types: "Vector" and "Node"}
 

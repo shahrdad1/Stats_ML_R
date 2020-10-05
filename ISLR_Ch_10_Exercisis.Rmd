@@ -1,0 +1,760 @@
+---
+title: "ISLR chapter 10 Exercises"
+output: 
+  pdf_document: default
+  html_notebook: default
+---
+
+
+```{r PCA on numeric data}
+library(tidyverse)      
+library(h2o)
+library(caret) 
+
+
+USA.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/USArrests.csv", 
+                   header=T, stringsAsFactors = F, na.strings = "?")
+
+USA.df.original = tibble(USA.df)
+USA.df = tibble(USA.df)
+
+str(USA.df)
+
+USA.df <- na.omit(USA.df)
+states <- row.names(USA.df)
+
+# identify near zero variables
+nearZeroVar(USA.df, saveMetrics= TRUE)
+
+# Identify correlated variables
+USA.df.numeric <- USA.df %>% select (c(-State))
+
+# clearly 5 combinations of features have moderate correlations (larger than 0.25)
+(descrCor <- USA.df.numeric %>% cor)
+summary(descrCor[upper.tri(descrCor)])
+
+# clculate maens per feature
+USA.df.numeric %>%
+  map(~c(...)) %>%
+  map_dbl(~mean(.))
+# diverse avrages shows assults is 11 times larger than nurder
+  
+# calculate variance per feature
+USA.df.numeric %>%
+  map(~c(...)) %>%
+  map_dbl(~var(.))
+
+# Thus we need to scale variables before doing PCA
+# h2o does missing data imputation, scaling and more
+
+h2o.no_progress()
+h2o.init(ip = "localhost", port = 54321, nthreads= -1, max_mem_size = "10g")
+h2o.removeAll()
+
+# convert the df to h2o one
+USA.df.numeric.h2o <- as.h2o(USA.df.numeric)
+
+# Calculate pca  
+pca <- USA.df.numeric.h2o %>% 
+  h2o.prcomp(pca_method = "GramSVD", k = ncol(.), transform = "STANDARDIZE", 
+             impute_missing = T, max_runtime_secs = 60)
+
+# Loadings vectors (eigen vectors) 
+pca@model$eigenvectors
+
+# compute eigen values 
+# Standard deviation of a principal component is square root of the eigen value of that principal component
+# Thus:
+(eigen.values <- pca@model$importance["Standard deviation",] %>% 
+  as.vector() %>%
+  .^2)
+
+# sum of the eigen values == Number of features
+stopifnot( as.integer(sum(eigen.values)) == ncol(USA.df.numeric.h2o))
+
+# eigen value one == principal component would explain one variable worth of variability
+# Let's plot loading for PC1, to see the largest contibuting features
+pca@model$eigenvectors %>%
+  as.data.frame() %>% 
+  mutate(feature = row.names(.)) %>% 
+  # reorder treats its first argument as a categorical variable, and reorders its 
+  # levels based on the values of a second variable, usually numeric.
+  ggplot(aes(pc1, reorder(feature, pc1))) + 
+  geom_point()
+
+# Lets' see distinct groupings of features and how they contribute to PC1 and PC2
+pca@model$eigenvectors %>%
+  as.data.frame() %>% 
+  mutate(feature = row.names(.)) %>% 
+  ggplot(aes(pc1,pc2, label = feature)) +
+  geom_text()
+
+# keep only thoce PCs whose corresponding eigen value is >=1 
+which (eigen.values >= 1) # so we keep only PC1
+
+# Another criterion to choose number of Principal components are PVE and PCE
+
+(ve <- data.frame(PC = pca@model$importance %>% seq_along(),
+           PVE = pca@model$importance %>% .[2,] %>% unlist,
+           CVE = pca@model$importance %>% .[3,] %>% unlist))
+
+data.frame(PC = pca@model$importance %>% seq_along(),
+           PVE = pca@model$importance %>% .[2,] %>% unlist,
+           CVE = pca@model$importance %>% .[3,] %>% unlist) %>%
+  gather(metric, variance_explained, -PC)
+
+# The CVE section of the plot shows first two PCs explains about 88% of the variability
+data.frame(PC = pca@model$importance %>% seq_along(),
+           PVE = pca@model$importance %>% .[2,] %>% unlist,
+           CVE = pca@model$importance %>% .[3,] %>% unlist) %>%
+  gather(metric, variance_explained, -PC) %>%
+  ggplot(aes(PC, variance_explained))+
+  geom_point()+
+  facet_wrap(~ metric, ncol=1,scales="free")
+  
+# How many PCs are requiered to explain at least 88% of the total variability
+min(which(ve$CVE >= 0.75))
+
+# scree plot (elbow plot) shows eigen value or PVE for each PC
+data.frame(PC = pca@model$importance %>% seq_along(),
+           PVE = pca@model$importance %>% .[2,] %>% unlist) %>%
+  ggplot(aes(PC, PVE, group=1, label=PC))+
+  geom_point()+
+  geom_line()
+```
+
+```{r PCA on categoricl data and camprisons}
+
+```
+
+
+
+```{r k-Means clustering on numeric data}
+library(tidyverse) 
+library(stringr)
+library(cluster)
+library(factoextra)
+library(NbClust)
+
+set.seed(2)
+x <- matrix(rnorm(50*2), ncol=2)
+x[1:25,1] <- x[1:25,1] + 3
+x[1:25,2] <- x[1:25,2] - 4
+
+
+# first let'a pretend we don't know number of clusters and get suggestion for NbClust:
+res<-NbClust(x, distance = "euclidean", min.nc=2, max.nc=8, 
+            method = "complete", index = "ch")
+k = as.integer(res$Best.nc["Number_clusters"])
+
+km.out <- kmeans(x, centers = k, nstart = 10)
+
+# tot.withinss : total within clusters sum of squared that we wanted to minimize
+# so logically we choose k such that it causes significant loose to the value of  tot.withinss
+str(km.out)
+
+# If there are more dimensions , perform PCA and plot forst to principal components 
+plot(x, col=(km.out$cluster+1), main= "K-means clustering", xlab = "", ylab = "", pch=20, cex=2)
+
+
+# Steps to find appropriate number of clusters
+result <- tibble(k=NULL, wss = NULL)
+for (i in 1:20){
+  km.out <- kmeans(x, centers = i, nstart = 50)
+  result <- rbind(result, tibble(k = i, wss = km.out$tot.withinss))
+}
+
+# Draw the elbow : clearly 2 is reasonable value
+result %>%
+  ggplot(aes(k, wss, group=1, label=k))+
+  geom_point()+
+  geom_line()
+```
+
+
+
+KMeans Clustering not so mixed data (i.e not many NOIR scale features)
+```{r k-means on mixed data}
+
+library(tidyverse) 
+library(stringr)
+library(cluster)
+library(factoextra)
+library(NbClust)
+library(caret)
+library(recipes)
+
+# To perform k-means clustering on mixed data we may convert
+# ordinal categorical --> Numeric 
+# Nominal categorical --> one hot encode
+# Nota the due to one hot encoding dimension of the problem increases which makes computation slow
+ames_full <- read.csv("/Users/shahrdadshadab/env/R-workspace/Stats_ML_R/homlr/data/ames.csv", 
+                   header=T, stringsAsFactors = T, na.strings = "?")
+
+# mes_full %>% count(MS_SubClass)
+# ames_full %>% count(Neighborhood) %>% arrange(n)
+# ames_full %>% count(Screen_Porch) %>% arrange(n)
+
+ames_full %>% select_if(str_detect(names(.), "Qual|Cond|QC|Qu")) %>% head
+
+ames_full <- ames_full %>% 
+  mutate_if(str_detect(names(.), "Qual|Cond|QC|Qu"), as.numeric) 
+
+ames_full %>% select_if(str_detect(names(.), "Qual|Cond|QC|Qu"))  %>% head
+
+# one-hot encode : retain only the features and drop the sales price
+full_rank <- caret::dummyVars(Sale_Price ~ ., data =  ames_full, full_rank=T)
+ames_1hot <- predict(full_rank, ames_full)
+
+# A matrix of double values
+ames_1hot_scaled <- scale(ames_1hot)
+
+
+# Now use the k-means with elbow methods to find the nest number of k
+# similarities between elbow diagram for PAM and KNN shows
+# Outliers did not have significant impact on KNN.
+set.seed(1137)
+p1 <- fviz_nbclust(ames_1hot_scaled, kmeans, method="wss", k.max = 25, verbose = F) + 
+  ggtitle("(A) kmeans Elbow Method")
+
+p2 <- fviz_nbclust(ames_1hot_scaled, pam, method="wss", k.max = 25, verbose = F) + 
+  ggtitle("(B) pam Elbow Method")
+
+gridExtra::grid.arrange(p1,p2,nrow=1)
+```
+
+KMeans Clustering heavily mixed data (i.e many MOIR scale features) we use GOER distance)
+```{r PAM and Gower distance for clustering heavily mixed data}
+
+library(tidyverse) 
+library(cluster)
+library(factoextra)
+
+
+ames_full <- read.csv("/Users/shahrdadshadab/env/R-workspace/Stats_ML_R/homlr/data/ames.csv", 
+                   header=T, stringsAsFactors = T, na.strings = "?")
+# ---------------------------------------------------------------------------
+# First apply Gower distance to calculate distance matrix betwen observations
+# ---------------------------------------------------------------------------
+
+# cluster::daisy uses Gower distance for features with NOIR scales:
+
+# Nominal Scale: 
+#         daisy converts Nominal columns into one-hot encoded then calculate
+#         dice metric for two observations Xi and Xj across all one hot encoded 
+#         categorical variables and scores Xi and Xj as:
+#           'a' (Number of dummy variables with value 1 for Xi and Xj)
+#           'b' (Number of dummy variables with value 1 for Xi and 0 for Xj)
+#           'c' (Number of dummy variables with value 0 for Xi and 1 for Xj)
+#           'c' (Number of dummy variables with value 0 for Xi and 0 for Xj)
+#        Dice_Distance =  2a/(2a+b+c)
+
+# Ordinal Scale:
+#         daisy Firts ranks the variables then calculate Manhattan distance
+
+# Interval or Ratio Scale:
+#         daisy uses range-normalized Manhattan distance
+
+
+# cluster::daisy Does all transformation and calculate the distance matrix
+
+ames_full <- ames_full %>% select (-Sale_Price)
+gowr_dist <- daisy(ames_full, metric = "gower")
+
+# Now we can pass the matrix to our favorite clustering algorithm in clustrer pckage:
+# Kmeans uses mean for clustering which makes it very sensetive to outliers.
+# If we use Median instead of Mean with kmeans algorithm then the 
+# result is not derived by outliers. This algorithm called PAM
+# (Partitioning Around Medians) clustering.
+
+pam_gower <- pam(x=gowr_dist, k = 8, diss = T)
+pam_gower$clusinfo
+```
+
+Hierarchical Clustering not so mixed data (i.e not many NOIR scale features)
+```{r Hierarchial clustering}
+library(tidyverse) 
+library(stringr)
+library(cluster)
+library(factoextra)
+library(NbClust)
+library(caret)
+library(recipes)
+
+ames_full <- read.csv("/Users/shahrdadshadab/env/R-workspace/Stats_ML_R/homlr/data/ames.csv", 
+                   header=T, stringsAsFactors = T, na.strings = "?")
+
+ames_full %>% select_if(str_detect(names(.), "Qual|Cond|QC|Qu")) %>% head
+
+ames_full <- ames_full %>% 
+  mutate_if(str_detect(names(.), "Qual|Cond|QC|Qu"), as.numeric) 
+
+ames_full %>% select_if(str_detect(names(.), "Qual|Cond|QC|Qu"))  %>% head
+
+# one-hot encode : retain only the features and drop the sales price
+full_rank <- caret::dummyVars(Sale_Price ~ ., data =  ames_full, full_rank=T)
+ames_1hot <- predict(full_rank, ames_full)
+
+# A matrix of double values
+ames_1hot_scaled <- scale(ames_1hot)
+
+#-----------
+# use hclust
+# ----------
+set.seed(37123)
+
+distances <- dist(ames_1hot_scaled, method = "euclidean")
+hcl <- hclust(distances, method = "complete")
+
+# plot(hcl, cex=0.6, hang=-1)
+
+
+# ------------
+# AGNES and AC
+# ------------
+set.seed(37123)
+hc2 <- agnes(ames_1hot_scaled, method = "complete")
+
+hc2$ac
+
+# Use AC to compare clustering structure strangth of mutiple models on the same data 
+# AC closer to 1 means stronger structure:
+# clearly ward's linkage causes stronger hierarchical structure
+
+m <- c("complete", "ward")
+names(m) <- c("complete", "ward")
+m %>% map_dbl(~agnes(ames_1hot_scaled, method=.)$ac)
+
+
+# ------------
+# DIANA and DC
+# ------------
+hc3 <- diana(ames_1hot_scaled)
+hc3$dc
+
+
+# ------------------------------------------------------------------
+# Find optimal number of clusters using WSS, silhouette and gap_stat
+# ------------------------------------------------------------------
+
+p1 <- fviz_nbclust(ames_1hot_scaled, FUN = hcut, method = "wss", kk.max = 10) + 
+  ggtitle("(A) Elbow Method")
+
+p2 <- fviz_nbclust(ames_1hot_scaled, FUN = hcut, method = "silhouette", kk.max = 10) + 
+  ggtitle("(A) Silhouette Method")
+
+p3 <- fviz_nbclust(ames_1hot_scaled, FUN = hcut, method = "gap_stat", kk.max = 10) + 
+  ggtitle("(A) Gap Statistics Method")
+
+gridExtra::grid.arrange(p1,p2,p3,nrow=1)
+
+# seems like 8 is reasonable number of clusters
+
+
+
+```
+
+Hierarchical Clustering heavily mixed data (i.e many MOIR scale features) we use GOER distance)
+```{r AGNES , Diana and Gower distance for clustering heavily mixed data}
+
+library(tidyverse) 
+library(cluster)
+library(factoextra)
+
+
+ames_full <- read.csv("/Users/shahrdadshadab/env/R-workspace/Stats_ML_R/homlr/data/ames.csv", 
+                   header=T, stringsAsFactors = T, na.strings = "?")
+# ---------------------------------------------------------------------------
+# First apply Gower distance to calculate distance matrix betwen observations
+# ---------------------------------------------------------------------------
+
+# cluster::daisy uses Gower distance for features with NOIR scales:
+
+# Nominal Scale: 
+#         daisy converts Nominal columns into one-hot encoded then calculate
+#         dice metric for two observations Xi and Xj across all one hot encoded 
+#         categorical variables and scores Xi and Xj as:
+#           'a' (Number of dummy variables with value 1 for Xi and Xj)
+#           'b' (Number of dummy variables with value 1 for Xi and 0 for Xj)
+#           'c' (Number of dummy variables with value 0 for Xi and 1 for Xj)
+#           'c' (Number of dummy variables with value 0 for Xi and 0 for Xj)
+#        Dice_Distance =  2a/(2a+b+c)
+
+# Ordinal Scale:
+#         daisy Firts ranks the variables then calculate Manhattan distance
+
+# Interval or Ratio Scale:
+#         daisy uses range-normalized Manhattan distance
+
+
+# cluster::daisy Does all transformation and calculate the distance matrix
+
+ames_full <- ames_full %>% select (-Sale_Price)
+gowr_dist <- daisy(ames_full, metric = "gower")
+
+# Now we can pass the matrix to our favorite clustering algorithm in clustrer pckage:
+
+
+# ------------
+# AGNES and AC
+# ------------
+set.seed(37123)
+hc2 <- agnes(gowr_dist, method = "complete")
+
+hc2$ac
+
+# Use AC to compare clustering structure strangth of mutiple models on the same data 
+# AC closer to 1 means stronger structure:
+# clearly ward's linkage causes stronger hierarchical structure
+
+m <- c("complete", "ward")
+names(m) <- c("complete", "ward")
+m %>% map_dbl(~agnes(gowr_dist, method=.)$ac)
+
+
+# ------------
+# DIANA and DC
+# ------------
+hc3 <- diana(gowr_dist)
+hc3$dc
+
+
+```
+
+
+
+```{r Exercise 7}
+library(tidyverse) 
+library(stringr)
+library(cluster)
+library(factoextra)
+library(NbClust)
+library(caret)
+library(recipes)
+
+USA.df <- read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/USArrests.csv", 
+                   header=T, stringsAsFactors = T, na.strings = "?")
+
+USA.df <- na.omit(USA.df)
+
+USA.df <- USA.df %>% 
+  mutate_if(str_detect(names(.), "State"), as.numeric)
+
+USA.scaled <- scale(USA.df)
+
+USA.scaled.t <- t(USA.scaled)
+
+dist.square <- dist(USA.scaled.t, method = "euclidean")^2 %>% as.vector
+corr <- 1-cor(USA.scaled)
+
+corr.vec <- NULL
+for(i in seq_along(1:(nrow(corr)-1)))
+  for (j in (i+1) : ncol(corr))
+    corr.vec <- c(corr.vec , corr[i,j])
+
+# the proportions are all the same:
+dist.square / corr.vec
+
+
+```
+
+```{r Exercise 8}
+library(tidyverse)      
+library(h2o)
+library(caret) 
+
+
+USA.df = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/USArrests.csv", 
+                   header=T, stringsAsFactors = F, na.strings = "?")
+
+USA.df = tibble(USA.df) %>% na.omit
+
+# Identify correlated variables
+USA.df.numeric <- USA.df %>% select (c(-State))
+
+# Thus we need to scale variables before doing PCA
+# h2o does missing data imputation, scaling and more
+
+h2o.no_progress()
+h2o.init(ip = "localhost", port = 54321, nthreads= -1, max_mem_size = "10g")
+h2o.removeAll()
+
+# convert the df to h2o one
+USA.df.numeric.h2o <- as.h2o(USA.df.numeric)
+
+# Calculate pca  
+pca <- USA.df.numeric.h2o %>% 
+  h2o.prcomp(pca_method = "GramSVD", k = ncol(.), transform = "STANDARDIZE", 
+             impute_missing = T, max_runtime_secs = 60)
+
+
+ve <- data.frame(PC = pca@model$importance %>% seq_along(),
+           PVE = pca@model$importance %>% .[2,] %>% unlist)
+
+# Now Let's use the direct formula 
+
+# Loadings vectors (eigen vectors) 
+loadings.df <- pca@model$eigenvectors
+
+loadings <- as.matrix(loadings.df)
+
+USA.data <- as.matrix(scale(USA.df.numeric))
+
+
+scores <- NULL
+for (i in 1:ncol(loadings)){
+  score <- 0
+  for (j in 1: nrow(USA.data)){
+    score <- score + as.vector(loadings[, i] %*% USA.data[j,])^2
+  }
+  scores <- c(scores, score)
+}
+
+denuminator <- 0
+for (j in 1: ncol(USA.data))
+  denuminator <- denuminator + as.vector(USA.data[, j] %*% USA.data[,j])
+
+# Here is PVE direct calculation result
+scores/denuminator
+
+# Here is PVE H2o calculation result
+ve$PVE
+```
+
+```{r Exercise 9}
+library(tidyverse) 
+library(stringr)
+library(cluster)
+library(factoextra)
+library(NbClust)
+library(caret)
+library(recipes)
+
+USA.df.org = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/datasets/USArrests.csv", 
+                   header=T, stringsAsFactors = T, na.strings = "?")
+
+USA.df <- USA.df.org %>% 
+  mutate_if(str_detect(names(.), "State"), as.numeric) 
+
+USA.df = tibble(USA.df) %>% na.omit
+
+#-----------------------------------------------
+# use hclust to cluster states without scaling
+# ----------------------------------------------
+set.seed(37123)
+
+distances <- dist(USA.df, method = "euclidean")
+hcl <- hclust(distances, method = "complete")
+
+# cutting the three at height 1.5 gives us 3 clusters
+(sub_group <- cutree(hcl, h=118))
+
+table(sub_group)
+
+# Plot it
+fviz_dend(hcl, k=3, horiz = T, rect = T, rect_fill = T, 
+          rect_border = "jco", k_colors = "jco", cex = 0.1)
+
+# Now let's see what cities are in which cluster
+
+cbind(sub_group, USA.df.org) %>% select(sub_group, State)
+
+# ----------------------------------------------
+# Hierarchically cluster the states with scaling
+# ----------------------------------------------
+
+USA.df.scale = tibble(USA.df) %>% na.omit %>% scale
+
+distances <- dist(USA.df.scale, method = "euclidean")
+hcl <- hclust(distances, method = "complete")
+
+# cutting the three at height 4.6 gives us 3 clusters
+(sub_group <- cutree(hcl, h=4.6))
+
+table(sub_group)
+
+# Plot it
+fviz_dend(hcl, k=3, horiz = T, rect = T, rect_fill = T, 
+          rect_border = "jco", k_colors = "jco", cex = 0.1)
+
+# Now let's see what cities are in which cluster
+
+cbind(sub_group, USA.df.org) %>% select(sub_group, State)
+
+# scaling the data causes the tree hight decreases and tree be balances
+# 
+
+```
+
+```{r Exercise 10}
+library(tidyverse) 
+library(cluster)
+library(factoextra)
+library(NbClust)
+library(caret)
+library(recipes)
+library(h2o)
+
+# a) data generation
+set.seed(1013)
+x <- as.data.frame(matrix(rnorm(20*50) - 3 , nrow = 20))
+x <- rbind(x, matrix(rnorm(20*50) + .01 , nrow = 20))
+x <- rbind(x, matrix(rnorm(20*50) - 1.1 , nrow = 20))
+str(x)
+
+# b) Perform PCA on 60 observations
+# Thus we need to scale variables before doing PCA
+# h2o does missing data imputation, scaling and more
+
+h2o.no_progress()
+h2o.init(ip = "localhost", port = 54321, nthreads= -1, max_mem_size = "10g")
+h2o.removeAll()
+
+# convert the df to h2o one
+x.h2o <- as.h2o(x)
+
+# Calculate pca  
+pca <- x.h2o %>% 
+  h2o.prcomp(pca_method = "GramSVD", k = ncol(.), transform = "STANDARDIZE", 
+             impute_missing = T, max_runtime_secs = 60)
+
+
+# Lets' see distinct groupings of features and how they contribute to PC1 and PC2
+pca@model$eigenvectors %>%
+  as.data.frame() %>% 
+  mutate(feature = row.names(.)) %>% 
+  ggplot(aes(pc1,pc2, label = feature)) +
+  geom_text()
+
+# keep only thoce PCs whose corresponding eigen value is >=1 
+which (eigen.values >= 1) # so we keep only PC1
+
+# Another criterion to choose number of Principal components are PVE and PCE
+
+(ve <- data.frame(PC = pca@model$importance %>% seq_along(),
+           PVE = pca@model$importance %>% .[2,] %>% unlist,
+           CVE = pca@model$importance %>% .[3,] %>% unlist))
+
+data.frame(PC = pca@model$importance %>% seq_along(),
+           PVE = pca@model$importance %>% .[2,] %>% unlist,
+           CVE = pca@model$importance %>% .[3,] %>% unlist) %>%
+  gather(metric, variance_explained, -PC)
+
+# The CVE section of the plot shows first two PCs explains about 88% of the variability
+data.frame(PC = pca@model$importance %>% seq_along(),
+           PVE = pca@model$importance %>% .[2,] %>% unlist,
+           CVE = pca@model$importance %>% .[3,] %>% unlist) %>%
+  gather(metric, variance_explained, -PC) %>%
+  ggplot(aes(PC, variance_explained))+
+  geom_point()+
+  facet_wrap(~ metric, ncol=1,scales="free")
+  
+# How many PCs are requiered to explain at least 88% of the total variability
+min(which(ve$CVE >= 0.75))
+
+# screen plot (elbow plot) shows eigen value or PVE for each PC
+data.frame(PC = pca@model$importance %>% seq_along(),
+           PVE = pca@model$importance %>% .[2,] %>% unlist) %>%
+  ggplot(aes(PC, PVE, group=1, label=PC))+
+  geom_point()+
+  geom_line()
+
+
+# c) perform k means clustering for K = 3 and 
+km.out.3 <- kmeans(x, centers = 3, nstart = 10)
+kmeans.result.3 = data.frame(real = c(rep(1,20),rep(2,20),rep(3,20)),predicted = km.out.3$cluster)
+
+# Note that kmeans arbitrarily name the clusters which might not match with ours
+# What matters is number of observations in each cluster which in this case '
+# Kmeans did a perfect separation
+table(kmeans.result.3)
+
+# d) Perform Kmeans clustering for K = 2
+km.out.2 <- kmeans(x, centers = 2, nstart = 10)
+
+kmeans.result.2 = data.frame(real = c(rep(1,20),rep(2,20),rep(3,20)),predicted = km.out.2$cluster)
+kmeans.result.2
+
+# K means thrusted two of the clusters into one and recognized the other cluster perfectly
+table(kmeans.result.2)
+
+# d) Perform Kmeans clustering for K = 4
+km.out.4 <- kmeans(x, centers = 4, nstart = 10)
+
+kmeans.result.4 = data.frame(real = c(rep(1,20),rep(2,20),rep(3,20)),predicted = km.out.4$cluster)
+kmeans.result.4
+
+# Two of the clusters are perfectly recognized by Kmeans and one cluster is splited
+table(kmeans.result.4)
+
+# Perform k = 3 Kmeans on 60 X 2 matrix consists of first two principal component Score vectors
+# first let's calculate scores 
+# Loadings vectors (eigen vectors) 
+first.score.column <-  NULL
+second.score.column <-  NULL
+for(i in 1: nrow(x)){
+  first.score.column <- c( first.score.column, as.vector(pca@model$eigenvectors$pc1 %*% unlist(x[i, ])))
+  second.score.column <- c( second.score.column, as.vector(pca@model$eigenvectors$pc2 %*% unlist(x[i, ])))
+}
+
+(x.pca <- data.frame(score1 = first.score.column, score2 = second.score.column))
+
+# Now apply kmeans with k = 3 on this data 
+km.out.pca <- kmeans(x.pca, centers = 3, nstart = 10)
+
+# Lmeans recognizes three clusters perfectly
+table(km.out.pca$cluster)
+
+# g) scale the data on set x and then do the kmeans clustering with k = 3
+x.scale <- scale(x)
+km.out.scale <- kmeans(x.scale, centers = 3, nstart = 10)
+
+kmeans.result.scale = data.frame(real = c(rep(1,20),rep(2,20),rep(3,20)),predicted = km.out.scale$cluster)
+table(kmeans.result.scale)
+
+```
+```{r Exercise 11}
+library(tidyverse) 
+library(cluster)
+library(factoextra)
+library(NbClust)
+library(caret)
+
+# a) load data
+df.org = read.csv("/Users/shahrdadshadab/env/my-R-project/ISLR/Data/Ch10Ex11.csv", 
+                   header=F, stringsAsFactors = T, na.strings = "?")
+
+df.org.scaled <- scale(df.org)
+# b) Cluster the data using correlation based distance
+
+
+set.seed(37123)
+
+# Pearson correlation is too sensetive to outliers
+hr <- hclust(as.dist(1-cor(t(df.org.scaled), method="pearson")), method="complete")
+hc <- hclust(as.dist(1-cor(df.org.scaled, method="spearman")), method="complete") 
+
+# cutting the three at height 1.63 gives us 2 clusters
+sub_group <- cutree(hr, h=1.63)
+
+table(sub_group)
+
+# Plot it
+fviz_dend(hr, k=2, horiz = T, rect = T, rect_fill = T, 
+          rect_border = "jco", k_colors = "jco", cex = 0.1)
+
+# Let's change the linkage
+hr.1 <- hclust(as.dist(1-cor(t(df.org.scaled), method="pearson")), method="single")
+hc.1 <- hclust(as.dist(1-cor(df.org.scaled, method="spearman")), method="single") 
+
+# cutting the three at height 0.61 gives us 2 clusters
+sub_group.1 <- cutree(hr.1, h=0.61)
+
+table(sub_group.1)
+
+# Plot it, The linkage change causes a non balance tree
+fviz_dend(hr.1, k=2, horiz = T, rect = T, rect_fill = T, 
+          rect_border = "jco", k_colors = "jco", cex = 0.1)
+
+```
+
